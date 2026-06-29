@@ -10,7 +10,7 @@ interface MemberTableViewProps {
   onAddMember?: (member: FamilyMember) => void;
   onEditMember?: (member: FamilyMember) => void;
   onDeleteMember?: (id: string) => void;
-  onSyncAll?: (newMembers: FamilyMember[]) => Promise<{ success: boolean; count?: number; error?: string }>;
+  onSyncAll?: (newMembers: FamilyMember[]) => Promise<{ success: boolean; count?: number; error?: string; message?: string }>;
   currentUser?: { username: string; fullName: string; role: string } | null;
   onOpenLogin?: () => void;
 }
@@ -1195,8 +1195,8 @@ export default function MemberTableView({
       // Execute Sync to backend Supabase database
       const result = await onSyncAll(finalMembersList);
       if (result.success) {
-        setImportSuccess(`Đã đồng bộ hóa thành công ${importedMembers.length} thành viên vào cây gia phả!`);
-        alert(`Đồng bộ thành công! Đã cập nhật ${importedMembers.length} thành viên vào cây gia phả trên hệ thống.`);
+        setImportSuccess(result.message || `Đã đồng bộ hóa thành công ${importedMembers.length} thành viên vào cây gia phả!`);
+        alert(result.message || `Đồng bộ thành công! Đã cập nhật ${importedMembers.length} thành viên vào cây gia phả trên hệ thống.`);
         setIsImportModalOpen(false);
       } else {
         throw new Error(result.error || 'Lỗi lưu thông tin đồng bộ.');
@@ -1232,7 +1232,7 @@ export default function MemberTableView({
     try {
       const result = await onSyncAll(members);
       if (result.success) {
-        alert(`Đồng bộ hóa thành công toàn bộ ${members.length} thành viên lên cơ sở dữ liệu!`);
+        alert(result.message || `Đồng bộ hóa thành công toàn bộ ${members.length} thành viên lên cơ sở dữ liệu!`);
       } else {
         throw new Error(result.error || 'Lỗi đồng bộ.');
       }
