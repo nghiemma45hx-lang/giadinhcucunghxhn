@@ -1,14 +1,52 @@
 import React, { useState } from 'react';
-import { Users, Eye, HelpCircle, User, Award, ArrowRight, Heart } from 'lucide-react';
+import { Users, Eye, HelpCircle, User, Award, ArrowRight, Heart, RefreshCw } from 'lucide-react';
 import { FamilyMember } from '../types';
 
 interface TreeViewProps {
   members: FamilyMember[];
+  onSyncAll?: (newMembers: FamilyMember[]) => Promise<{ success: boolean; count?: number; error?: string; message?: string }>;
+  currentUser?: { username: string; fullName: string; role: string } | null;
+  onOpenLogin?: () => void;
 }
 
-export default function TreeView({ members }: TreeViewProps) {
+export default function TreeView({ members, onSyncAll, currentUser, onOpenLogin }: TreeViewProps) {
   const [selectedMember, setSelectedMember] = useState<FamilyMember | null>(null);
   const [branchFilter, setBranchFilter] = useState<string>('all');
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // Action: Direct Manual Sync current UI members list to server
+  const handleManualSyncAll = async () => {
+    if (!currentUser) {
+      if (onOpenLogin) {
+        onOpenLogin();
+      } else {
+        alert('Vui lòng đăng nhập quyền quản trị để thực hiện đồng bộ hóa phả hệ!');
+      }
+      return;
+    }
+    if (!onSyncAll) {
+      alert('Tính năng đồng bộ hóa chưa được kích hoạt.');
+      return;
+    }
+    
+    if (!window.confirm(`Bạn có chắc chắn muốn đồng bộ hóa toàn bộ danh sách hiện tại (${members.length} thành viên) lên cơ sở dữ liệu đám mây?`)) {
+      return;
+    }
+
+    setIsSyncing(true);
+    try {
+      const result = await onSyncAll(members);
+      if (result.success) {
+        alert(result.message || `Đồng bộ hóa thành công toàn bộ ${members.length} thành viên lên cơ sở dữ liệu!`);
+      } else {
+        throw new Error(result.error || 'Lỗi đồng bộ.');
+      }
+    } catch (err: any) {
+      alert('Đồng bộ thất bại: ' + (err.message || 'Lỗi kết nối'));
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const handleNodeClick = (member: FamilyMember) => {
     setSelectedMember(member);
@@ -36,18 +74,32 @@ export default function TreeView({ members }: TreeViewProps) {
             </p>
           </div>
           
-          {/* Branch filters */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-gray-400 uppercase">Lọc theo Chi:</span>
-            <select
-              value={branchFilter}
-              onChange={(e) => setBranchFilter(e.target.value)}
-              className="p-2 border border-[#d6b583] rounded-lg bg-[#fdfbf7] text-sm text-[#4a3219] focus:outline-none focus:ring-2 focus:ring-[#b8956b]"
+          {/* Sync Button & Branch filters */}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Manual Sync Button */}
+            <button
+              type="button"
+              onClick={handleManualSyncAll}
+              disabled={isSyncing}
+              className="px-3 py-2 bg-[#5d4037] hover:bg-[#4e342e] text-white text-xs font-bold rounded-lg transition flex items-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-50"
+              title="Đồng bộ tất cả danh sách phả hệ hiện tại lên cơ sở dữ liệu"
             >
-              <option value="all">Toàn bộ gia quyến</option>
-              <option value="Chi Cụ Bà Cả">Chi Cụ Bà Cả</option>
-              <option value="Chi Cụ Bà Hai">Chi Cụ Bà Hai</option>
-            </select>
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span>Đồng Bộ Tất Cả</span>
+            </button>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-gray-400 uppercase">Lọc theo Chi:</span>
+              <select
+                value={branchFilter}
+                onChange={(e) => setBranchFilter(e.target.value)}
+                className="p-2 border border-[#d6b583] rounded-lg bg-[#fdfbf7] text-sm text-[#4a3219] focus:outline-none focus:ring-2 focus:ring-[#b8956b]"
+              >
+                <option value="all">Toàn bộ gia quyến</option>
+                <option value="Chi Cụ Bà Cả">Chi Cụ Bà Cả</option>
+                <option value="Chi Cụ Bà Hai">Chi Cụ Bà Hai</option>
+              </select>
+            </div>
           </div>
         </div>
 

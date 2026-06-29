@@ -1157,7 +1157,14 @@ export default function App() {
               />
             )}
 
-            {currentTab === 'family-tree' && <TreeView members={members} />}
+            {currentTab === 'family-tree' && (
+              <TreeView
+                members={members}
+                onSyncAll={handleSyncAll}
+                currentUser={currentUser}
+                onOpenLogin={() => setIsLoginModalOpen(true)}
+              />
+            )}
 
             {currentTab === 'member-table' && (
               <MemberTableView
