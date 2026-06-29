@@ -386,6 +386,33 @@ export default function App() {
     await addLog(`xóa bỏ thành viên khỏi gia hệ: ${name}`, currentUser?.fullName || 'admin');
   };
 
+  const handleSyncAll = async (newMembers: FamilyMember[]) => {
+    saveMembers(newMembers);
+    try {
+      const res = await fetch('/api/members/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newMembers)
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data) {
+          setMembers(json.data);
+          localStorage.setItem('gia_pha_members', JSON.stringify(json.data));
+        }
+        await addLog(`đồng bộ hóa toàn bộ danh sách phả hệ (${newMembers.length} thành viên)`, currentUser?.fullName || 'admin');
+        return { success: true, count: newMembers.length };
+      } else {
+        const errJson = await res.json();
+        throw new Error(errJson.error || "HTTP sync error");
+      }
+    } catch (err: any) {
+      console.error("Failed to sync members to Supabase:", err);
+      await addLog(`lỗi đồng bộ hóa phả hệ: ${err.message}`, currentUser?.fullName || 'admin');
+      return { success: false, error: err.message };
+    }
+  };
+
   const handleAddAnnouncement = async (ann: Announcement) => {
     const updated = [ann, ...announcements];
     saveAnnouncements(updated);
@@ -674,6 +701,7 @@ export default function App() {
                 onAddMember={handleAddMember}
                 onEditMember={handleEditMember}
                 onDeleteMember={handleDeleteMember}
+                onSyncAll={handleSyncAll}
                 currentUser={currentUser}
                 onOpenLogin={() => setIsLoginModalOpen(true)}
               />

@@ -176,6 +176,48 @@ app.get("/api/members", async (req, res) => {
   }
 });
 
+app.post("/api/members/sync", async (req, res) => {
+  try {
+    const supabase = getSupabaseClient();
+    const members = req.body;
+    if (!Array.isArray(members)) {
+      return res.status(400).json({ error: "Data must be an array of members" });
+    }
+
+    // Since we are syncing ALL, we can upsert. Let's filter out invalid IDs or handle empty arrays
+    if (members.length === 0) {
+      // If we are syncing an empty list, let's clear the table or return success
+      return res.json({ success: true, data: [] });
+    }
+
+    // Try upserting. Since some members might be new and some updated, we upsert them.
+    // If there is no ID, we can generate a new one, but they should usually have IDs.
+    const preparedMembers = members.map(m => {
+      if (!m.id) {
+        m.id = `m-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      }
+      return m;
+    });
+
+    let { data, error } = await supabase.from("family_members").upsert(preparedMembers).select();
+    if (error) {
+      if (error.message && (error.message.includes("spouseIds") || error.message.includes("column"))) {
+        console.warn("Bulk sync failed with spouseIds column error. Retrying without 'spouseIds'.");
+        const cleanedMembers = preparedMembers.map(({ spouseIds, ...rest }: any) => rest);
+        const retryResult = await supabase.from("family_members").upsert(cleanedMembers).select();
+        if (retryResult.error) throw retryResult.error;
+        data = retryResult.data;
+      } else {
+        throw error;
+      }
+    }
+    return res.json({ success: true, data: data || preparedMembers });
+  } catch (error: any) {
+    console.error("POST /api/members/sync error:", error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 app.post("/api/members", async (req, res) => {
   try {
     const supabase = getSupabaseClient();

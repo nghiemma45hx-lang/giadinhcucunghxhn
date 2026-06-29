@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Table, Calendar, MapPin, Phone, User, Award, Search, ArrowUpDown, Shield, PlusCircle, Edit2, Trash2, X, Plus } from 'lucide-react';
+import { Table, Calendar, MapPin, Phone, User, Award, Search, ArrowUpDown, Shield, PlusCircle, Edit2, Trash2, X, Plus, Download, Upload, RefreshCw, FileSpreadsheet, FileJson, Check, Loader2 } from 'lucide-react';
 // @ts-ignore
 import { getLunarDate } from 'vietnamese-lunar-calendar';
 import { FamilyMember } from '../types';
@@ -9,6 +9,7 @@ interface MemberTableViewProps {
   onAddMember?: (member: FamilyMember) => void;
   onEditMember?: (member: FamilyMember) => void;
   onDeleteMember?: (id: string) => void;
+  onSyncAll?: (newMembers: FamilyMember[]) => Promise<{ success: boolean; count?: number; error?: string }>;
   currentUser?: { username: string; fullName: string; role: string } | null;
   onOpenLogin?: () => void;
 }
@@ -18,6 +19,7 @@ export default function MemberTableView({
   onAddMember,
   onEditMember,
   onDeleteMember,
+  onSyncAll,
   currentUser,
   onOpenLogin,
 }: MemberTableViewProps) {
@@ -55,6 +57,352 @@ export default function MemberTableView({
   const [isMarried, setIsMarried] = useState(false);
   const [relationNotes, setRelationNotes] = useState('');
   const [spouseSearch, setSpouseSearch] = useState('');
+
+  // --- NEW IMPORT/EXPORT & SYNC STATES & HELPERS ---
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importedMembers, setImportedMembers] = useState<FamilyMember[]>([]);
+  const [importType, setImportType] = useState<'merge' | 'replace'>('merge');
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importSuccess, setImportSuccess] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isTemplateMenuOpen, setIsTemplateMenuOpen] = useState(false);
+
+  // Helper: Simple CSV parser that supports quotes
+  const parseCSV = (text: string): Record<string, string>[] => {
+    const lines = text.split(/\r?\n/);
+    if (lines.length === 0) return [];
+    
+    const rawHeaders = lines[0].split(',');
+    const headers = rawHeaders.map(h => h.trim().replace(/^"|"$/g, ''));
+    
+    const results: Record<string, string>[] = [];
+    
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+      
+      const values: string[] = [];
+      let current = '';
+      let inQuotes = false;
+      
+      for (let j = 0; j < line.length; j++) {
+        const char = line[j];
+        if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+          values.push(current.trim().replace(/^"|"$/g, ''));
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      values.push(current.trim().replace(/^"|"$/g, ''));
+      
+      const obj: Record<string, string> = {};
+      headers.forEach((header, index) => {
+        obj[header] = values[index] || '';
+      });
+      results.push(obj);
+    }
+    return results;
+  };
+
+  // Helper: Map CSV key/values to FamilyMember object properties
+  const mapCsvRowToMember = (row: Record<string, string>): Partial<FamilyMember> => {
+    const findVal = (keys: string[]): string => {
+      for (const k of keys) {
+        const foundKey = Object.keys(row).find(rk => 
+          rk.toLowerCase().trim() === k.toLowerCase() || 
+          rk.toLowerCase().includes(k.toLowerCase())
+        );
+        if (foundKey) return row[foundKey];
+      }
+      return '';
+    };
+
+    const id = findVal(['id', 'mã số', 'ma so']);
+    const name = findVal(['name', 'họ và tên', 'ho va ten', 'họ & tên', 'ho & ten']);
+    const genderStr = findVal(['gender', 'giới tính', 'gioi tinh']).toLowerCase();
+    const gender: 'male' | 'female' = genderStr.includes('nữ') || genderStr.includes('female') ? 'female' : 'male';
+    
+    const genStr = findVal(['generation', 'đời thứ', 'doi thu', 'đời', 'doi']);
+    const generation = parseInt(genStr) || 18;
+    
+    const role = findVal(['role', 'vai trò', 'vai tro']);
+    const birthYear = findVal(['birthyear', 'năm sinh', 'nam sinh', 'birth']);
+    const deathYear = findVal(['deathyear', 'năm mất', 'nam mat', 'death']);
+    const deceasedStr = findVal(['isdeceased', 'đã mất', 'da mat', 'deceased']).toLowerCase();
+    const isDeceased = deceasedStr.includes('true') || deceasedStr.includes('có') || deceasedStr.includes('đã mất') || deathYear !== '';
+    
+    const parentId = findVal(['parentid', 'mã cha', 'ma cha']);
+    const motherId = findVal(['motherid', 'mã mẹ', 'ma me']);
+    const spouseId = findVal(['spouseid', 'mã vợ/chồng', 'mã vợ', 'mã chồng', 'ma vo', 'ma chong']);
+    
+    const marriedStr = findVal(['ismarried', 'đã kết hôn', 'da ket hon', 'kết hôn', 'ket hon']).toLowerCase();
+    const isMarried = marriedStr.includes('true') || marriedStr.includes('có') || spouseId !== '';
+    
+    const branch = findVal(['branch', 'chi nhánh', 'chi nhanh', 'phân chi', 'phan chi']) || 'Nhánh chính';
+    const story = findVal(['story', 'tiểu sử', 'tieu su']);
+    const occupation = findVal(['occupation', 'nghề nghiệp', 'nghe nghiep']);
+    const address = findVal(['address', 'địa chỉ', 'dia chi']);
+    const phone = findVal(['phone', 'điện thoại', 'dien thoai', 'sđt', 'sdt']);
+
+    return {
+      id: id || `m-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      name: name || 'Thành viên mới',
+      gender,
+      generation,
+      role: role || 'Thành viên',
+      birthYear: birthYear || undefined,
+      deathYear: isDeceased ? (deathYear || undefined) : undefined,
+      isDeceased,
+      parentId: parentId || undefined,
+      motherId: motherId || undefined,
+      spouseId: spouseId || undefined,
+      isMarried: isMarried || undefined,
+      branch: branch || 'Nhánh chính',
+      story: story || undefined,
+      occupation: occupation || undefined,
+      address: address || undefined,
+      phone: phone || undefined
+    };
+  };
+
+  // Action: Trigger file selection programmatically
+  const triggerFileInput = () => {
+    if (!currentUser) {
+      if (onOpenLogin) {
+        onOpenLogin();
+      } else {
+        alert('Vui lòng đăng nhập bằng tài khoản quản trị để thực hiện tải lên biểu mẫu!');
+      }
+      return;
+    }
+    const input = document.getElementById('import-file-input');
+    if (input) input.click();
+  };
+
+  // Action: Read and parse selected CSV/JSON file
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportError(null);
+    setImportSuccess(null);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result as string;
+        if (file.name.endsWith('.json')) {
+          const parsed = JSON.parse(text);
+          if (Array.isArray(parsed)) {
+            setImportedMembers(parsed);
+            setIsImportModalOpen(true);
+          } else if (parsed && typeof parsed === 'object') {
+            setImportedMembers([parsed]);
+            setIsImportModalOpen(true);
+          } else {
+            throw new Error('Định dạng tệp JSON không hợp lệ. Phải là một mảng danh sách thành viên.');
+          }
+        } else if (file.name.endsWith('.csv')) {
+          const rows = parseCSV(text);
+          if (rows.length === 0) {
+            throw new Error('Tệp CSV trống hoặc không tìm thấy dòng dữ liệu hợp lệ.');
+          }
+          const parsedMembers = rows.map(r => mapCsvRowToMember(r) as FamilyMember);
+          setImportedMembers(parsedMembers);
+          setIsImportModalOpen(true);
+        } else {
+          throw new Error('Chỉ hỗ trợ tệp định dạng .csv hoặc .json');
+        }
+      } catch (err: any) {
+        setImportError(err.message || 'Lỗi đọc tệp dữ liệu phả hệ.');
+        alert(err.message || 'Lỗi đọc tệp dữ liệu phả hệ.');
+      }
+    };
+    reader.readAsText(file, 'UTF-8');
+    e.target.value = '';
+  };
+
+  // Action: Download CSV template with Vietnamese columns and UTF-8 BOM
+  const downloadCSVTemplate = () => {
+    const viHeaders = [
+      'Mã số (id)', 'Họ và tên (name)', 'Giới tính (gender: male/female)', 
+      'Đời thứ (generation)', 'Vai trò (role)', 'Năm sinh (birthYear)', 
+      'Năm mất (deathYear)', 'Đã mất (isDeceased: true/false)', 
+      'Mã cha (parentId)', 'Mã mẹ (motherId)', 'Mã vợ/chồng (spouseId)', 
+      'Đã kết hôn (isMarried: true/false)', 'Chi nhánh (branch)', 
+      'Tiểu sử (story)', 'Nghề nghiệp (occupation)', 'Địa chỉ (address)', 'Số điện thoại (phone)'
+    ];
+
+    const sampleRows = [
+      [
+        'nghiem-dieu', 'Nghiêm Điều (Chu)', 'male', '15', 'CỤ CỐ ÔNG', 
+        '1875', '1945', 'true', '', '', 'cu-ba-lun', 'true', 'Nhánh chính', 
+        'Cụ cố khởi tổ sinh cơ lập nghiệp tại Hòa Xá...', 'Nông nghiệp', 'Hòa Xá, Ứng Hòa, Hà Nội', ''
+      ],
+      [
+        'cu-ba-lun', 'Đỗ Thị Lùn', 'female', '15', 'CỤ CỐ BÀ', 
+        '1880', '1952', 'true', '', '', 'nghiem-dieu', 'true', 'Nhánh chính', 
+        'Cụ cố bà hiền từ đảm đang gánh vác...', 'Nội trợ', 'Hòa Xá, Ứng Hòa, Hà Nội', ''
+      ],
+      [
+        'nghiem-cung', 'Nghiêm Cung', 'male', '16', 'CỤ ÔNG TRỤ CỘT', 
+        '1902', '1978', 'true', 'nghiem-dieu', 'cu-ba-lun', '', 'false', 'Nhánh chính', 
+        'Y sĩ nổi tiếng trong vùng Hòa Xá...', 'Đông y', 'Hòa Xá, Ứng Hòa, Hà Nội', ''
+      ]
+    ];
+
+    // Perfect UTF-8 BOM
+    let csvContent = '\uFEFF';
+    csvContent += viHeaders.join(',') + '\n';
+    sampleRows.forEach(row => {
+      const escaped = row.map(val => {
+        const s = String(val);
+        if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+          return `"${s.replace(/"/g, '""')}"`;
+        }
+        return s;
+      });
+      csvContent += escaped.join(',') + '\n';
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'bieu_mau_nhap_gia_pha.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setIsTemplateMenuOpen(false);
+  };
+
+  // Action: Download JSON template
+  const downloadJSONTemplate = () => {
+    const sampleJSON = [
+      {
+        id: "nghiem-dieu",
+        name: "Nghiêm Điều (Chu)",
+        gender: "male",
+        generation: 15,
+        role: "CỤ CỐ ÔNG",
+        birthYear: "1875",
+        deathYear: "1945",
+        isDeceased: true,
+        parentId: "",
+        motherId: "",
+        spouseId: "cu-ba-lun",
+        isMarried: true,
+        branch: "Nhánh chính",
+        story: "Cụ cố khởi tổ sinh cơ lập nghiệp...",
+        occupation: "Nông nghiệp",
+        address: "Hòa Xá, Ứng Hòa, Hà Nội",
+        phone: ""
+      },
+      {
+        id: "cu-ba-lun",
+        name: "Đỗ Thị Lùn",
+        gender: "female",
+        generation: 15,
+        role: "CỤ CỐ BÀ",
+        birthYear: "1880",
+        deathYear: "1952",
+        isDeceased: true,
+        parentId: "",
+        motherId: "",
+        spouseId: "nghiem-dieu",
+        isMarried: true,
+        branch: "Nhánh chính",
+        story: "Cụ cố bà tảo tần gánh vác việc gia đình...",
+        occupation: "Nội trợ",
+        address: "Hòa Xá, Ứng Hòa, Hà Nội",
+        phone: ""
+      }
+    ];
+
+    const blob = new Blob([JSON.stringify(sampleJSON, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'bieu_mau_nhap_gia_pha.json');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setIsTemplateMenuOpen(false);
+  };
+
+  // Action: Process import locally and call backend sync
+  const handleConfirmImport = async () => {
+    if (!onSyncAll) {
+      alert('Ứng dụng chưa được cấu hình tính năng đồng bộ máy chủ.');
+      return;
+    }
+    setIsSyncing(true);
+    try {
+      let finalMembersList: FamilyMember[] = [];
+      if (importType === 'replace') {
+        finalMembersList = [...importedMembers];
+      } else {
+        // Merge: Update matching IDs, add new ones
+        const existingMap = new Map(members.map(m => [m.id, m]));
+        importedMembers.forEach(m => {
+          existingMap.set(m.id, m);
+        });
+        finalMembersList = Array.from(existingMap.values());
+      }
+
+      // Execute Sync to backend Supabase database
+      const result = await onSyncAll(finalMembersList);
+      if (result.success) {
+        setImportSuccess(`Đã đồng bộ hóa thành công ${importedMembers.length} thành viên vào cây gia phả!`);
+        alert(`Đồng bộ thành công! Đã cập nhật ${importedMembers.length} thành viên vào cây gia phả trên hệ thống.`);
+        setIsImportModalOpen(false);
+      } else {
+        throw new Error(result.error || 'Lỗi lưu thông tin đồng bộ.');
+      }
+    } catch (err: any) {
+      setImportError(err.message || 'Đồng bộ phả hệ thất bại.');
+      alert('Lỗi đồng bộ phả hệ: ' + (err.message || 'Lỗi không xác định'));
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // Action: Direct Manual Sync current UI members list to server
+  const handleManualSyncAll = async () => {
+    if (!currentUser) {
+      if (onOpenLogin) {
+        onOpenLogin();
+      } else {
+        alert('Vui lòng đăng nhập quyền quản trị để thực hiện đồng bộ hóa phả hệ!');
+      }
+      return;
+    }
+    if (!onSyncAll) {
+      alert('Tính năng đồng bộ hóa chưa được kích hoạt.');
+      return;
+    }
+    
+    if (!window.confirm(`Bạn có chắc chắn muốn đồng bộ hóa toàn bộ danh sách hiện tại (${members.length} thành viên) lên cơ sở dữ liệu đám mây?`)) {
+      return;
+    }
+
+    setIsSyncing(true);
+    try {
+      const result = await onSyncAll(members);
+      if (result.success) {
+        alert(`Đồng bộ hóa thành công toàn bộ ${members.length} thành viên lên cơ sở dữ liệu!`);
+      } else {
+        throw new Error(result.error || 'Lỗi đồng bộ.');
+      }
+    } catch (err: any) {
+      alert('Đồng bộ thất bại: ' + (err.message || 'Lỗi kết nối'));
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+  // --------------------------------------------------
 
   // Filter members
   const filteredMembers = useMemo(() => {
@@ -390,6 +738,75 @@ export default function MemberTableView({
                 <option key={gen} value={gen}>Đời thứ {gen}</option>
               ))}
             </select>
+
+            {/* Hidden Input for Import */}
+            <input
+              type="file"
+              id="import-file-input"
+              accept=".csv,.json"
+              className="hidden"
+              onChange={handleFileSelect}
+            />
+
+            {/* Template Download Option Dropdown */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsTemplateMenuOpen(!isTemplateMenuOpen)}
+                className="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold rounded-lg border border-amber-200 transition flex items-center gap-1.5 shrink-0 cursor-pointer"
+                title="Tải biểu mẫu nhập dữ liệu về máy tính"
+              >
+                <Download className="w-3.5 h-3.5 text-amber-700" />
+                <span>Tải Mẫu</span>
+              </button>
+              
+              {isTemplateMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setIsTemplateMenuOpen(false)}></div>
+                  <div className="absolute right-0 mt-1.5 w-48 bg-white border border-[#eadecb] rounded-lg shadow-lg z-20 py-1 text-xs">
+                    <button
+                      type="button"
+                      onClick={downloadCSVTemplate}
+                      className="w-full text-left px-4 py-2 hover:bg-[#fdfbf7] flex items-center gap-2 text-gray-700 font-medium cursor-pointer"
+                    >
+                      <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                      Tải mẫu CSV (Excel)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={downloadJSONTemplate}
+                      className="w-full text-left px-4 py-2 hover:bg-[#fdfbf7] flex items-center gap-2 text-gray-700 font-medium cursor-pointer"
+                    >
+                      <FileJson className="w-4 h-4 text-blue-500" />
+                      Tải mẫu JSON
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Upload Button */}
+            <button
+              type="button"
+              onClick={triggerFileInput}
+              className="px-3 py-2 bg-[#fdfbf7] hover:bg-[#f4f0e6] text-[#6b4724] text-xs font-bold rounded-lg border border-[#d6b583] transition flex items-center gap-1.5 shrink-0 cursor-pointer"
+              title="Tải tệp dữ liệu phả hệ từ máy tính (.csv, .json)"
+            >
+              <Upload className="w-3.5 h-3.5 text-[#b8956b]" />
+              <span>Up Mẫu</span>
+            </button>
+
+            {/* Manual Sync Button */}
+            <button
+              type="button"
+              onClick={handleManualSyncAll}
+              disabled={isSyncing}
+              className="px-3 py-2 bg-[#5d4037] hover:bg-[#4e342e] text-white text-xs font-bold rounded-lg transition flex items-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-50"
+              title="Đồng bộ tất cả danh sách phả hệ hiện tại lên cơ sở dữ liệu"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span>Đồng Bộ Tất Cả</span>
+            </button>
 
             {/* Add Member Button */}
             <button
@@ -1281,6 +1698,151 @@ export default function MemberTableView({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* IMPORT MODAL PREVIEW */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-3xl w-full overflow-hidden border border-[#b8956b] shadow-2xl animate-in fade-in zoom-in duration-200">
+            {/* Header */}
+            <div className="p-5 bg-gradient-to-r from-[#5d4037] to-[#8b7355] text-white flex justify-between items-center">
+              <h3 className="text-lg font-bold font-serif uppercase tracking-wider flex items-center gap-2">
+                <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
+                Xác nhận nhập dữ liệu từ máy tính
+              </h3>
+              <button
+                onClick={() => setIsImportModalOpen(false)}
+                className="text-white/80 hover:text-white text-2xl font-bold leading-none bg-white/10 hover:bg-white/20 px-2 rounded-full cursor-pointer"
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 max-h-[80vh] overflow-y-auto text-xs text-gray-700">
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 leading-relaxed">
+                <p className="font-bold text-sm mb-1">📋 Thông tin tệp dữ liệu tải lên:</p>
+                <p>Đã nhận diện và phân tích thành công <strong className="text-[#6b4724] text-sm">{importedMembers.length}</strong> thành viên gia hệ.</p>
+                <p className="mt-1 text-[11px] text-amber-800">Mẹo: Hệ thống tự động phân tích và chuẩn hóa các cột tiếng Việt/tiếng Anh tương ứng từ Excel CSV hoặc JSON.</p>
+              </div>
+
+              {/* Mode Select */}
+              <div className="space-y-2.5">
+                <label className="block font-bold text-[#6b4724] text-xs">Phương thức đồng bộ dữ liệu:</label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <label className={`p-3 border rounded-xl flex items-start gap-2.5 cursor-pointer transition ${
+                    importType === 'merge' ? 'border-amber-600 bg-amber-50/30 font-semibold' : 'border-gray-200 hover:bg-gray-50'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="importType"
+                      value="merge"
+                      checked={importType === 'merge'}
+                      onChange={() => setImportType('merge')}
+                      className="mt-0.5 accent-amber-700 cursor-pointer"
+                    />
+                    <div>
+                      <span className="block text-[#5d4037] font-bold">Gộp phả hệ (Khuyên dùng)</span>
+                      <span className="block text-[11px] text-gray-500 font-normal mt-0.5">Giữ lại danh sách hiện tại. Cập nhật các cụ/thành viên trùng mã số (ID), và thêm mới các thành viên chưa có.</span>
+                    </div>
+                  </label>
+
+                  <label className={`p-3 border rounded-xl flex items-start gap-2.5 cursor-pointer transition ${
+                    importType === 'replace' ? 'border-rose-600 bg-rose-50/10 font-semibold' : 'border-gray-200 hover:bg-gray-50'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="importType"
+                      value="replace"
+                      checked={importType === 'replace'}
+                      onChange={() => setImportType('replace')}
+                      className="mt-0.5 accent-rose-700 cursor-pointer"
+                    />
+                    <div>
+                      <span className="block text-rose-800 font-bold">Ghi đè toàn bộ (Xóa danh sách cũ)</span>
+                      <span className="block text-[11px] text-gray-500 font-normal mt-0.5">Xóa hoàn toàn danh sách phả hệ hiện có trên cơ sở dữ liệu và thay thế 100% bằng danh sách mới trong tệp tải lên.</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Preview Table */}
+              <div className="space-y-1.5">
+                <label className="block font-bold text-[#6b4724] text-xs">Xem trước danh sách thành viên trong tệp ({importedMembers.length} người):</label>
+                <div className="overflow-x-auto rounded-lg border border-gray-200 max-h-48 overflow-y-auto">
+                  <table className="w-full border-collapse text-left text-[11px]">
+                    <thead>
+                      <tr className="bg-gray-50 text-gray-600 border-b border-gray-200 font-bold">
+                        <th className="p-2">Mã số (ID)</th>
+                        <th className="p-2">Họ & Tên</th>
+                        <th className="p-2">Giới tính</th>
+                        <th className="p-2">Đời thứ</th>
+                        <th className="p-2">Vai trò</th>
+                        <th className="p-2">Chi Nhánh</th>
+                        <th className="p-2">Năm Sinh/Mất</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 text-gray-700">
+                      {importedMembers.slice(0, 15).map((m, idx) => (
+                        <tr key={m.id || idx} className="hover:bg-gray-50">
+                          <td className="p-2 font-mono text-gray-400 text-[10px]">{m.id}</td>
+                          <td className="p-2 font-bold text-gray-800">{m.name}</td>
+                          <td className="p-2">
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${m.gender === 'male' ? 'bg-blue-50 text-blue-700' : 'bg-rose-50 text-rose-700'}`}>
+                              {m.gender === 'male' ? 'Nam' : 'Nữ'}
+                            </span>
+                          </td>
+                          <td className="p-2 text-center font-bold">Đời {m.generation}</td>
+                          <td className="p-2 text-gray-500">{m.role || 'Thành viên'}</td>
+                          <td className="p-2 text-gray-500">{m.branch || 'Nhánh chính'}</td>
+                          <td className="p-2 text-gray-400">
+                            {m.birthYear || '?'}{m.isDeceased ? ` - ${m.deathYear || '?'}` : ' (Sống)'}
+                          </td>
+                        </tr>
+                      ))}
+                      {importedMembers.length > 15 && (
+                        <tr>
+                          <td colSpan={7} className="p-2.5 text-center text-gray-400 font-medium bg-gray-50 italic">
+                            ... và {importedMembers.length - 15} thành viên khác ở phía dưới ...
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Submit Buttons */}
+              <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+                <button
+                  type="button"
+                  disabled={isSyncing}
+                  onClick={() => setIsImportModalOpen(false)}
+                  className="px-5 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 font-bold cursor-pointer disabled:opacity-50 text-gray-700"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmImport}
+                  disabled={isSyncing}
+                  className="px-6 py-2 bg-[#5d4037] text-white rounded-lg hover:bg-[#4e342e] shadow-md font-bold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isSyncing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Đang đồng bộ...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      Xác Nhận Nhập & Đồng Bộ
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
