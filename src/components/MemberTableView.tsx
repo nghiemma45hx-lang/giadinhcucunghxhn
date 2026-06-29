@@ -44,6 +44,10 @@ export default function MemberTableView({
   const [address, setAddress] = useState('');
   const [phone, setPhone] = useState('');
 
+  const [originalParentId, setOriginalParentId] = useState('');
+  const [originalSpouseId, setOriginalSpouseId] = useState('');
+  const [relationNotes, setRelationNotes] = useState('');
+
   // Filter members
   const filteredMembers = useMemo(() => {
     return members.filter(m => {
@@ -116,6 +120,9 @@ export default function MemberTableView({
     setOccupation('');
     setAddress('');
     setPhone('');
+    setOriginalParentId('');
+    setOriginalSpouseId('');
+    setRelationNotes('');
     setIsModalOpen(true);
   };
 
@@ -140,10 +147,19 @@ export default function MemberTableView({
     setParentId(member.parentId || '');
     setSpouseId(member.spouseId || '');
     setBranch(member.branch);
-    setStory(member.story || '');
+    
+    // Parse story for relationNotes
+    const parts = (member.story || '').split(' ||| ');
+    const mainStory = parts[0] || '';
+    const relNotes = parts[1] || '';
+    setStory(mainStory);
+    setRelationNotes(relNotes);
+    
     setOccupation(member.occupation || '');
     setAddress(member.address || '');
     setPhone(member.phone || '');
+    setOriginalParentId(member.parentId || '');
+    setOriginalSpouseId(member.spouseId || '');
     setIsModalOpen(true);
   };
 
@@ -160,10 +176,19 @@ export default function MemberTableView({
     setParentId(targetMember.parentId || '');
     setSpouseId(targetMember.spouseId || '');
     setBranch(targetMember.branch);
-    setStory(targetMember.story || '');
+    
+    // Parse story for relationNotes
+    const parts = (targetMember.story || '').split(' ||| ');
+    const mainStory = parts[0] || '';
+    const relNotes = parts[1] || '';
+    setStory(mainStory);
+    setRelationNotes(relNotes);
+
     setOccupation(targetMember.occupation || '');
     setAddress(targetMember.address || '');
     setPhone(targetMember.phone || '');
+    setOriginalParentId(targetMember.parentId || '');
+    setOriginalSpouseId(targetMember.spouseId || '');
   };
 
   // Bầu đoàn nhà cụ/ông/bác/anh calculations
@@ -186,24 +211,24 @@ export default function MemberTableView({
   // Handle member form submit
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !role.trim()) {
-      alert('Vui lòng điền tên thành viên và vai trò trong gia quyến.');
-      return;
-    }
+    // Name and Role are no longer mandatory as requested: (*) không bắt buộc ghi tên; ghi vai vế
+
+    const finalName = name.trim() || 'Khuyết danh';
+    const finalRole = role.trim() || 'Chưa rõ vai vế';
 
     const payload: FamilyMember = {
       id: editingMember ? editingMember.id : `mem-${Date.now()}`,
-      name: name.trim(),
+      name: finalName,
       gender,
       generation: Number(generation),
-      role: role.trim(),
+      role: finalRole,
       birthYear: birthYear.trim() || undefined,
       deathYear: isDeceased ? (deathYear.trim() || undefined) : undefined,
       isDeceased,
       parentId: parentId || undefined,
       spouseId: spouseId || undefined,
       branch,
-      story: story.trim() || undefined,
+      story: relationNotes.trim() ? `${story.trim()} ||| ${relationNotes.trim()}` : story.trim() || undefined,
       occupation: occupation.trim() || undefined,
       address: address.trim() || undefined,
       phone: phone.trim() || undefined,
@@ -222,6 +247,52 @@ export default function MemberTableView({
     }
 
     setIsModalOpen(false);
+  };
+
+  const getCanChi = (yearStr: string): string => {
+    const year = parseInt(yearStr, 10);
+    if (!year || isNaN(year)) return '';
+    const cans = ['Canh', 'Tân', 'Nhâm', 'Quý', 'Giáp', 'Ất', 'Bính', 'Đinh', 'Mậu', 'Kỷ'];
+    const chis = ['Thân', 'Dậu', 'Tuất', 'Hợi', 'Tý', 'Sửu', 'Dần', 'Mão', 'Thìn', 'Tỵ', 'Ngọ', 'Mùi'];
+    const canIndex = year % 10;
+    const chiIndex = year % 12;
+    return `${cans[canIndex]} ${chis[chiIndex]}`;
+  };
+
+  const getAgeAndLifespanText = () => {
+    const bYear = parseInt(birthYear, 10);
+    if (!bYear || isNaN(bYear)) return null;
+
+    const birthLunar = getCanChi(birthYear);
+    const currentYear = 2026;
+
+    if (isDeceased) {
+      const dYear = parseInt(deathYear, 10);
+      if (!dYear || isNaN(dYear)) {
+        return {
+          birthLunar,
+          deathLunar: '',
+          ageText: `Sinh năm ${birthYear} (${birthLunar}). Trạng thái: Đã tạ thế.`
+        };
+      }
+      const deathLunar = getCanChi(deathYear);
+      const ageDiff = dYear - bYear;
+      const ageLunar = ageDiff + 1;
+      const term = ageDiff >= 60 ? 'Hưởng thọ' : 'Hưởng dương';
+      return {
+        birthLunar,
+        deathLunar,
+        ageText: `Sinh: ${birthYear} (${birthLunar}) — Mất: ${deathYear} (${deathLunar}). ${term}: ${ageDiff} tuổi (Tuổi mụ: ${ageLunar} tuổi)`
+      };
+    } else {
+      const ageDiff = currentYear - bYear;
+      const ageLunar = ageDiff + 1;
+      return {
+        birthLunar,
+        deathLunar: '',
+        ageText: `Sinh: ${birthYear} (${birthLunar}). Tuổi hiện tại: ${ageDiff} tuổi (Tuổi mụ: ${ageLunar} tuổi)`
+      };
+    }
   };
 
   return (
@@ -395,10 +466,9 @@ export default function MemberTableView({
                 
                 {/* Name */}
                 <div>
-                  <label className="block font-bold text-[#6b4724] mb-1">Họ và Tên (*):</label>
+                  <label className="block font-bold text-[#6b4724] mb-1">Họ và Tên (Không bắt buộc):</label>
                   <input
                     type="text"
-                    required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     className="w-full p-2 border border-[#d6b583] rounded bg-[#fdfbf7] focus:outline-none focus:ring-2 focus:ring-[#b8956b]"
@@ -408,10 +478,9 @@ export default function MemberTableView({
 
                 {/* Role */}
                 <div>
-                  <label className="block font-bold text-[#6b4724] mb-1">Vai trò trong dòng họ (*):</label>
+                  <label className="block font-bold text-[#6b4724] mb-1">Vai trò trong dòng họ (Không bắt buộc):</label>
                   <input
                     type="text"
-                    required
                     value={role}
                     onChange={(e) => setRole(e.target.value)}
                     className="w-full p-2 border border-[#d6b583] rounded bg-[#fdfbf7] focus:outline-none focus:ring-2 focus:ring-[#b8956b]"
@@ -517,31 +586,58 @@ export default function MemberTableView({
                   </div>
                 )}
 
+                {/* Dynamic Lunar & Age Info */}
+                {getAgeAndLifespanText() && (
+                  <div className="col-span-1 md:col-span-2 p-3 bg-amber-50/60 border border-amber-200 rounded-xl flex items-start gap-2.5 shadow-2xs">
+                    <span className="text-sm mt-0.5">📅</span>
+                    <div>
+                      <p className="font-bold text-amber-950 leading-snug">
+                        Tính toán Âm lịch & Tuổi thọ (Tự sinh):
+                      </p>
+                      <p className="font-semibold text-amber-900 mt-0.5">
+                        {getAgeAndLifespanText()?.ageText}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Parent Link */}
                 <div>
                   <div className="flex justify-between items-center mb-1">
                     <label className="font-bold text-[#6b4724]">Liên kết phụ thân (Cha):</label>
-                    {parentId && (
-                      <div className="flex gap-2">
+                    <div className="flex gap-1.5 items-center">
+                      {parentId && (
+                        <div className="flex gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const target = members.find(m => m.id === parentId);
+                              if (target) handleSwitchToMember(target);
+                            }}
+                            className="text-[10px] bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded hover:bg-amber-200 font-bold cursor-pointer"
+                          >
+                            Sửa Cha
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setParentId('')}
+                            className="text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded hover:bg-rose-200 font-bold cursor-pointer"
+                          >
+                            Xóa liên kết
+                          </button>
+                        </div>
+                      )}
+                      {parentId !== originalParentId && (
                         <button
                           type="button"
-                          onClick={() => {
-                            const target = members.find(m => m.id === parentId);
-                            if (target) handleSwitchToMember(target);
-                          }}
-                          className="text-[10px] text-amber-800 hover:underline font-bold cursor-pointer"
+                          onClick={() => setParentId(originalParentId)}
+                          className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded hover:bg-blue-200 font-bold cursor-pointer"
+                          title="Khôi phục liên kết gốc"
                         >
-                          Sửa Cha
+                          Undo (Hoàn tác)
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => setParentId('')}
-                          className="text-[10px] text-rose-600 hover:underline font-bold cursor-pointer"
-                        >
-                          Hủy liên kết
-                        </button>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                   <select
                     value={parentId}
@@ -561,27 +657,39 @@ export default function MemberTableView({
                 <div>
                   <div className="flex justify-between items-center mb-1">
                     <label className="font-bold text-[#6b4724]">Liên kết hôn phối (Vợ / Chồng):</label>
-                    {spouseId && (
-                      <div className="flex gap-2 border border-amber-300 rounded bg-amber-50 px-1.5 py-0.5">
+                    <div className="flex gap-1.5 items-center">
+                      {spouseId && (
+                        <div className="flex gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const target = members.find(m => m.id === spouseId);
+                              if (target) handleSwitchToMember(target);
+                            }}
+                            className="text-[10px] bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded hover:bg-amber-200 font-bold cursor-pointer"
+                          >
+                            Sửa Vợ/Chồng
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSpouseId('')}
+                            className="text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded hover:bg-rose-200 font-bold cursor-pointer"
+                          >
+                            Xóa liên kết
+                          </button>
+                        </div>
+                      )}
+                      {spouseId !== originalSpouseId && (
                         <button
                           type="button"
-                          onClick={() => {
-                            const target = members.find(m => m.id === spouseId);
-                            if (target) handleSwitchToMember(target);
-                          }}
-                          className="text-[10px] text-amber-900 hover:underline font-bold cursor-pointer"
+                          onClick={() => setSpouseId(originalSpouseId)}
+                          className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded hover:bg-blue-200 font-bold cursor-pointer"
+                          title="Khôi phục liên kết hôn phối gốc"
                         >
-                          Sửa Vợ/Chồng
+                          Undo (Hoàn tác)
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => setSpouseId('')}
-                          className="text-[10px] text-rose-700 hover:underline font-bold cursor-pointer"
-                        >
-                          Hủy liên kết
-                        </button>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                   <select
                     value={spouseId}
@@ -687,6 +795,20 @@ export default function MemberTableView({
                       Hãy chọn Liên kết phụ thân (Cha) ở phía trên để tự động hiển thị bầu đoàn nhà cụ/ông/bác/anh...
                     </div>
                   )}
+
+                  {/* Textarea inside the Bầu đoàn card */}
+                  <div className="mt-3.5 pt-3 border-t border-[#eadecb]">
+                    <label className="block font-bold text-[#6b4724] mb-1">
+                      Nhập thông tin bầu đoàn liên quan / ghi chú khác:
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={relationNotes}
+                      onChange={(e) => setRelationNotes(e.target.value)}
+                      className="w-full p-2 border border-[#d6b583] rounded bg-white text-[11px] text-[#5c4021] placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-[#b8956b] resize-none animate-in fade-in duration-200"
+                      placeholder="Hãy nhập thêm thông tin chi tiết về bầu đoàn gia đình, vợ thứ, các con cháu, hoặc các mối quan hệ thân tộc khác tại đây..."
+                    />
+                  </div>
                 </div>
 
                 {/* Occupation */}
