@@ -679,14 +679,17 @@ app.post("/api/members/parse-document", async (req, res) => {
             .replace(/\s+/g, "-"); // replace spaces with dashes
         };
 
-        // Filter out completely empty rows where name is missing or empty
+        // Filter out completely empty rows where there is no identifiable info
         const filteredRows = rows.filter(r => {
           const name = findVal(r, ["name", "họ và tên", "ho va ten", "họ & tên", "ho & ten", "tên"]);
-          return name && name.trim().length > 0;
+          const role = findVal(r, ["role", "vai trò", "vai tro", "danh xưng"]);
+          const gen = findVal(r, ["generation", "đời thứ", "doi thu", "đời", "doi"]);
+          const story = findVal(r, ["story", "tiểu sử", "tieu su", "ghi chú"]);
+          return (name && name.trim().length > 0) || (role && role.trim().length > 0) || (gen && gen.trim().length > 0) || (story && story.trim().length > 0);
         });
 
         if (filteredRows.length === 0) {
-          return res.status(400).json({ error: "Không tìm thấy thành viên nào có tên hợp lệ trong tệp Excel của bạn." });
+          return res.status(400).json({ error: "Không tìm thấy thành viên nào có thông tin hợp lệ trong tệp Excel của bạn." });
         }
 
         // Build a map of Name and Slug to ID for auto-resolving relations
@@ -696,10 +699,10 @@ app.post("/api/members/parse-document", async (req, res) => {
         // First pass: create basic records and populate name/slug map
         const tempParsedMembers = filteredRows.map((r, idx) => {
           const rawId = findVal(r, ["id", "mã số", "ma so", "mã"]);
-          const name = findVal(r, ["name", "họ và tên", "ho va ten", "họ & tên", "ho & ten", "tên"]);
+          const name = findVal(r, ["name", "họ và tên", "ho va ten", "họ & tên", "ho & ten", "tên"]) || "Khuyết danh";
           
           // Generate a clean slug ID if none is supplied
-          const id = rawId || toSlug(name) || `m-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 4)}`;
+          const id = rawId || (name !== "Khuyết danh" ? toSlug(name) : "") || `m-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 4)}`;
           
           if (name) {
             nameToIdMap.set(name.toLowerCase().trim(), id);

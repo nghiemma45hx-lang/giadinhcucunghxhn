@@ -5,6 +5,11 @@
   --font-serif: "Playfair Display", ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
 }
 
+/* Thiết lập phông chữ Lora hỗ trợ tiếng Việt toàn diện cho biểu mẫu và toàn bộ ứng dụng */
+input, select, textarea, button, label, form {
+  font-family: "Lora", "Inter", ui-sans-serif, system-ui, sans-serif !important;
+}
+
 /* Custom scrollbar and decorative scroll effects */
 ::-webkit-scrollbar {
   width: 6px;
