@@ -503,30 +503,464 @@ export default function App() {
   };
 
   const handleExportWord = () => {
-    // Elegant download trigger
-    const content = `GIA PHẢ GIA ĐÌNH CỤ NGHIÊM CUNG\n\nDanh sách dòng tộc chi thứ đời 15 - 19:\n\n` + 
-                    members.map(m => `- Đời ${m.generation}: ${m.name} (${m.role}) - ${m.isDeceased ? 'Đã mất' : 'Còn sống'}`).join('\n') + 
-                    `\n\nXuất bản tại Hà Nội, năm 2026.`;
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'GiaPha_CuNghiemCung_XuatBan.doc';
-    link.click();
-    addLog('tải xuống văn bản gia phả thô (.doc)', 'Người dùng');
+    try {
+      if (!members || members.length === 0) {
+        alert("Không có dữ liệu thành viên nào để xuất!");
+        return;
+      }
+
+      // Sort members by generation then by name
+      const sortedByGen = [...members].sort((a, b) => {
+        if (a.generation !== b.generation) return a.generation - b.generation;
+        return a.name.localeCompare(b.name, 'vi');
+      });
+
+      // Group members by generation
+      const genGroups: { [key: number]: FamilyMember[] } = {};
+      sortedByGen.forEach(m => {
+        if (!genGroups[m.generation]) genGroups[m.generation] = [];
+        genGroups[m.generation].push(m);
+      });
+
+      let contentHtml = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+        <head>
+          <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+          <style>
+            @page {
+              size: 8.5in 11.0in;
+              margin: 1.0in 1.0in 1.0in 1.0in;
+            }
+            body { 
+              font-family: "Times New Roman", Times, serif; 
+              line-height: 1.6; 
+              color: #2b1b0c; 
+            }
+            .cover {
+              text-align: center;
+              margin-top: 50px;
+              margin-bottom: 50px;
+            }
+            .cover h1 {
+              font-size: 24pt;
+              color: #5d4037;
+              font-weight: bold;
+              text-transform: uppercase;
+              margin-bottom: 10px;
+            }
+            .cover h2 {
+              font-size: 16pt;
+              color: #8b7355;
+              font-style: italic;
+              margin-bottom: 30px;
+            }
+            .stats-table {
+              width: 100%;
+              border-collapse: collapse;
+              margin: 20px 0;
+            }
+            .stats-table th, .stats-table td {
+              border: 1px solid #d6b583;
+              padding: 8px;
+              text-align: left;
+              font-size: 11pt;
+            }
+            .stats-table th {
+              background-color: #fbf8f3;
+              color: #5d4037;
+              font-weight: bold;
+            }
+            h2.gen-title {
+              color: #5d4037;
+              font-size: 16pt;
+              border-bottom: 2px solid #b8956b;
+              padding-bottom: 5px;
+              margin-top: 30px;
+              font-weight: bold;
+            }
+            .member-card {
+              margin-bottom: 20px;
+              padding-bottom: 15px;
+              border-bottom: 1px dashed #e2d3be;
+            }
+            .member-name {
+              font-size: 13pt;
+              font-weight: bold;
+              color: #6b4724;
+            }
+            .member-meta {
+              font-style: italic;
+              color: #555555;
+              font-size: 10.5pt;
+              margin-bottom: 5px;
+            }
+            .member-story {
+              font-size: 11pt;
+              text-align: justify;
+              margin-top: 5px;
+            }
+            .quote {
+              font-style: italic;
+              background-color: #faf7f2;
+              border-left: 3px solid #b8956b;
+              padding: 8px 15px;
+              margin: 15px 0;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="cover">
+            <h1>PHẢ HỆ CHI TIẾT DÒNG HỌ NGHIÊM</h1>
+            <h2>Hội Đồng Gia Tộc Nghiêm Cung - Hòa Xá, Ứng Hòa, Hà Nội</h2>
+            <p><strong>Ngày xuất bản:</strong> ${new Date().toLocaleDateString('vi-VN')}</p>
+            <p><strong>Số lượng thành viên:</strong> ${members.length} người | <strong>Số thế hệ:</strong> ${Object.keys(genGroups).length} đời</p>
+            <div class="quote">
+              "Cây có cội mới nảy cành xanh lá,<br/>
+              Nước có nguồn mới bể rộng sông sâu.<br/>
+              Người ta nguồn gốc từ đâu,<br/>
+              Có tổ tiên trước rồi sau có mình."
+            </div>
+          </div>
+
+          <hr/>
+
+          <h2 class="gen-title">I. THỐNG KÊ DANH SÁCH THÀNH VIÊN</h2>
+          <table class="stats-table">
+            <thead>
+              <tr>
+                <th style="width: 15%">Đời thứ</th>
+                <th style="width: 35%">Họ và tên</th>
+                <th style="width: 15%">Giới tính</th>
+                <th style="width: 20%">Vai trò</th>
+                <th style="width: 15%">Trạng thái</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${sortedByGen.map(m => `
+                <tr>
+                  <td>Đời ${m.generation}</td>
+                  <td><strong>${m.name}</strong></td>
+                  <td>${m.gender === 'male' ? 'Nam' : 'Nữ'}</td>
+                  <td>${m.role}</td>
+                  <td>${m.isDeceased ? 'Đã tạ thế' : 'Còn sống'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          <h2 class="gen-title">II. CHI TIẾT PHẢ KÝ CÁC THẾ HỆ</h2>
+          ${Object.keys(genGroups).sort((a, b) => Number(a) - Number(b)).map(gen => `
+            <h3>THẾ HỆ THỨ ${gen} (ĐỜI ${gen})</h3>
+            ${genGroups[Number(gen)].map(m => {
+              const spouse = m.spouseId ? members.find(sp => sp.id === m.spouseId) : null;
+              const parent = m.parentId ? members.find(p => p.id === m.parentId) : null;
+              const mother = m.motherId ? members.find(mo => mo.id === m.motherId) : null;
+              
+              return `
+                <div class="member-card">
+                  <div class="member-name">${m.name} (${m.role})</div>
+                  <div class="member-meta">
+                    Giới tính: ${m.gender === 'male' ? 'Nam' : 'Nữ'} | 
+                    Năm sinh: ${m.birthYear || 'Chưa rõ'} | 
+                    Trạng thái: ${m.isDeceased ? `Đã mất (Năm mất: ${m.deathYear || 'Chưa rõ'})` : 'Còn sống'}
+                  </div>
+                  <div class="member-meta" style="font-size: 9.5pt; color: #777777;">
+                    ${parent ? `Cha: ${parent.name} | ` : ''}
+                    ${mother ? `Mẹ: ${mother.name} | ` : ''}
+                    ${spouse ? `Hôn phối: ${spouse.name} | ` : ''}
+                    Chi nhánh: ${m.branch}
+                  </div>
+                  ${m.story ? `<div class="member-story"><strong>Tiểu sử:</strong> ${m.story}</div>` : ''}
+                  ${m.occupation ? `<div class="member-story"><strong>Nghề nghiệp:</strong> ${m.occupation}</div>` : ''}
+                  ${m.address ? `<div class="member-story"><strong>Địa chỉ/Nơi an táng:</strong> ${m.address}</div>` : ''}
+                  ${m.phone ? `<div class="member-story"><strong>Số điện thoại:</strong> ${m.phone}</div>` : ''}
+                </div>
+              `;
+            }).join('')}
+          `).join('')}
+          
+          <div style="text-align: center; margin-top: 50px; font-size: 10pt; color: #777777;">
+            <p>Phả hệ được khởi tạo và lưu trữ trên Hệ thống số hóa Gia Phả Họ Nghiêm</p>
+            <p>© ${new Date().getFullYear()} Dòng Họ Nghiêm Cung. Tất cả các quyền được bảo lưu.</p>
+          </div>
+        </body>
+        </html>
+      `;
+
+      const blob = new Blob([contentHtml], { type: 'application/msword;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'GiaPha_CuNghiemCung_XuatBan.doc';
+      link.click();
+      addLog('tải xuống văn bản gia phả thô (.doc)', currentUser?.fullName || 'Người dùng');
+    } catch (error: any) {
+      console.error("Word document export error:", error);
+      alert("Không thể xuất bản Word: " + error.message);
+    }
   };
 
   const handleExportPdf = () => {
-    const content = `GIA PHẢ GIA ĐÌNH CỤ NGHIÊM CUNG\n\nChiết xuất báo cáo hồ sơ phả hệ kỹ thuật số\n\n` + 
-                    members.map(m => `[Thế hệ ${m.generation}] ${m.name} | Vai trò: ${m.role} | Trạng thái: ${m.isDeceased ? 'Đã tạ thế' : 'Còn sống'} | Nơi ở: ${m.address || 'Hòa Xá'}`).join('\n') + 
-                    `\n\nTài liệu nội bộ lưu hành gia tộc.`;
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'BaoCao_Phashe_CuNghiemCung.pdf';
-    link.click();
-    addLog('tải xuống văn bản PDF bảo tồn (.pdf)', 'Người dùng');
+    try {
+      if (!members || members.length === 0) {
+        alert("Không có dữ liệu thành viên nào để xuất!");
+        return;
+      }
+
+      // Sort members by generation then by name
+      const sortedByGen = [...members].sort((a, b) => {
+        if (a.generation !== b.generation) return a.generation - b.generation;
+        return a.name.localeCompare(b.name, 'vi');
+      });
+
+      // Group members by generation
+      const genGroups: { [key: number]: FamilyMember[] } = {};
+      sortedByGen.forEach(m => {
+        if (!genGroups[m.generation]) genGroups[m.generation] = [];
+        genGroups[m.generation].push(m);
+      });
+
+      const pdfHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Gia Phả Số Hóa Họ Nghiêm Cung - Hòa Xá</title>
+          <style>
+            @media print {
+              body { margin: 0; padding: 0; background: white; font-size: 10pt; }
+              .no-print { display: none; }
+              .page-break { page-break-before: always; }
+            }
+            body {
+              font-family: 'Times New Roman', Times, serif;
+              line-height: 1.6;
+              color: #2b1b0c;
+              background-color: #faf7f2;
+              margin: 0;
+              padding: 40px;
+            }
+            .container {
+              max-width: 900px;
+              margin: 0 auto;
+              background: white;
+              padding: 40px 50px;
+              border: 1px solid #e2d3be;
+              box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+              position: relative;
+            }
+            .container::before {
+              content: "";
+              position: absolute;
+              top: 15px; left: 15px; right: 15px; bottom: 15px;
+              border: 1px solid #b8956b;
+              pointer-events: none;
+              opacity: 0.5;
+              box-sizing: border-box;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 30px;
+              border-bottom: 2px double #b8956b;
+              padding-bottom: 20px;
+            }
+            .header h1 {
+              font-size: 22pt;
+              margin: 0 0 10px 0;
+              color: #5d4037;
+              font-weight: bold;
+              text-transform: uppercase;
+              letter-spacing: 1px;
+            }
+            .header p {
+              margin: 5px 0;
+              font-style: italic;
+              color: #6d4c41;
+              font-size: 11pt;
+            }
+            h2 {
+              color: #5d4037;
+              font-size: 14pt;
+              border-bottom: 1px solid #d6b583;
+              padding-bottom: 5px;
+              margin-top: 25px;
+              text-transform: uppercase;
+              font-weight: bold;
+            }
+            h3 {
+              color: #8b7355;
+              font-size: 12pt;
+              margin-top: 20px;
+              border-left: 3px solid #b8956b;
+              padding-left: 10px;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin: 15px 0;
+            }
+            th, td {
+              border: 1px solid #d6b583;
+              padding: 8px 10px;
+              text-align: left;
+              font-size: 9.5pt;
+            }
+            th {
+              background-color: #fbf8f3;
+              color: #5d4037;
+              font-weight: bold;
+            }
+            .member-row {
+              margin-bottom: 15px;
+              padding-bottom: 10px;
+              border-bottom: 1px dotted #e2d3be;
+            }
+            .member-row-name {
+              font-weight: bold;
+              color: #5d4037;
+              font-size: 11pt;
+            }
+            .member-row-meta {
+              font-size: 9pt;
+              color: #666;
+              font-style: italic;
+            }
+            .member-row-story {
+              font-size: 10pt;
+              text-align: justify;
+              margin-top: 4px;
+            }
+            .footer {
+              margin-top: 50px;
+              text-align: center;
+              font-size: 9.5pt;
+              color: #777777;
+              border-top: 1px dashed #d6b583;
+              padding-top: 15px;
+            }
+            .no-print-bar {
+              max-width: 900px;
+              margin: 0 auto 20px auto;
+              background: #5d4037;
+              color: white;
+              padding: 12px 20px;
+              border-radius: 8px;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              font-family: system-ui, sans-serif;
+              font-size: 13px;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            }
+            .print-btn {
+              background: #b8956b;
+              color: white;
+              border: none;
+              padding: 8px 16px;
+              border-radius: 4px;
+              font-weight: bold;
+              cursor: pointer;
+              transition: background 0.2s;
+            }
+            .print-btn:hover {
+              background: #a37f55;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="no-print-bar no-print">
+            <span><strong>🖨️ TRÌNH XUẤT BẢN PDF PHẢ HỆ:</strong> Bản phả hệ được biên tập với giao diện hoàng gia chuẩn vector thích hợp in ấn hoặc xuất PDF.</span>
+            <button class="print-btn" onclick="window.print()">In / Xuất PDF</button>
+          </div>
+
+          <div class="container">
+            <div class="header">
+              <h1>GIA PHẢ SỐ HÓA HỌ NGHIÊM</h1>
+              <p>Hội Đồng Gia Tộc Nghiêm Cung — Hòa Xá, Ứng Hòa, Hà Nội</p>
+              <p>Ngày trích lục hệ thống: ${new Date().toLocaleDateString('vi-VN')} | Tổng số: ${members.length} thành viên</p>
+            </div>
+
+            <h2>I. BẢNG THỐNG KÊ SƠ LƯỢC CÁC THẾ HỆ</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 10%">Đời</th>
+                  <th style="width: 25%">Họ và tên</th>
+                  <th style="width: 12%">Giới tính</th>
+                  <th style="width: 18%">Vai trò</th>
+                  <th style="width: 15%">Năm sinh/mất</th>
+                  <th style="width: 20%">Chi nhánh</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${sortedByGen.map(m => `
+                  <tr>
+                    <td><strong>Đời ${m.generation}</strong></td>
+                    <td><strong>${m.name}</strong></td>
+                    <td>${m.gender === 'male' ? 'Nam' : 'Nữ'}</td>
+                    <td>${m.role}</td>
+                    <td>${m.birthYear || '?'}${m.isDeceased ? ` - ${m.deathYear || '?'}` : ''}</td>
+                    <td>${m.branch}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+
+            <div class="page-break"></div>
+
+            <h2>II. PHẢ KÝ CHI TIẾT DÒNG HỌ</h2>
+            ${Object.keys(genGroups).sort((a, b) => Number(a) - Number(b)).map(gen => `
+              <h3>THẾ HỆ THỨ ${gen} (ĐỜI ${gen})</h3>
+              <div style="padding-left: 10px;">
+                ${genGroups[Number(gen)].map(m => {
+                  const spouse = m.spouseId ? members.find(sp => sp.id === m.spouseId) : null;
+                  const parent = m.parentId ? members.find(p => p.id === m.parentId) : null;
+                  
+                  return `
+                    <div class="member-row">
+                      <div class="member-row-name">${m.name} <span style="font-weight: normal; font-size: 9.5pt; color: #8b7355;">(${m.role})</span></div>
+                      <div class="member-row-meta">
+                        Giới tính: ${m.gender === 'male' ? 'Nam' : 'Nữ'} | 
+                        Sinh: ${m.birthYear || 'Chưa rõ'} | 
+                        Trạng thái: ${m.isDeceased ? `Đã tạ thế (Mất năm: ${m.deathYear || 'Chưa rõ'})` : 'Còn sống'}
+                        ${parent ? ` | Con của: ${parent.name}` : ''}
+                        ${spouse ? ` | Hôn phối: ${spouse.name}` : ''}
+                      </div>
+                      ${m.story ? `<div class="member-row-story"><strong>Tiểu sử:</strong> ${m.story}</div>` : ''}
+                      ${m.occupation ? `<div class="member-row-story"><strong>Nghề nghiệp:</strong> ${m.occupation}</div>` : ''}
+                      ${m.address ? `<div class="member-row-story"><strong>Địa chỉ/Nơi an táng:</strong> ${m.address}</div>` : ''}
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            `).join('')}
+
+            <div class="footer">
+              <p>Mộc bản thủ nguyên - Hệ thống Gia Phả Số Hóa Gia Tộc Nghiêm Cung</p>
+              <p>Hòa Xá, ngày ${new Date().getDate()} tháng ${new Date().getMonth() + 1} năm ${new Date().getFullYear()}</p>
+            </div>
+          </div>
+          <script>
+            window.onload = function() {
+              setTimeout(function() { window.print(); }, 500);
+            };
+          </script>
+        </body>
+        </html>
+      `;
+
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(pdfHtml);
+        printWindow.document.close();
+      } else {
+        alert("Không thể mở trình in PDF. Vui lòng cho phép mở cửa sổ bật lên (popup) trên trình duyệt của bạn.");
+      }
+      addLog('tải xuống văn bản PDF bảo tồn (.pdf)', currentUser?.fullName || 'Người dùng');
+    } catch (error: any) {
+      console.error("PDF generation error:", error);
+      alert("Không thể tạo PDF: " + error.message);
+    }
   };
 
   return (
