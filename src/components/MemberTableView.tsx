@@ -218,6 +218,143 @@ export default function MemberTableView({
       return;
     }
 
+    // If it's Excel, parse it locally client-side using SheetJS
+    if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const data = new Uint8Array(event.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          
+          if (workbook.SheetNames.length === 0) {
+            throw new Error('Tệp Excel không chứa trang dữ liệu nào.');
+          }
+
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          
+          // Convert sheet to array of arrays
+          const rows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
+          if (rows.length <= 1) {
+            throw new Error('Tệp Excel trống hoặc không tìm thấy dòng dữ liệu hợp lệ.');
+          }
+
+          // Row index 0 is headers
+          const headers = (rows[0] as any[]).map(h => h ? String(h).toLowerCase().trim() : '');
+          const getColIndex = (keywords: string[]): number => {
+            return headers.findIndex(h => h && keywords.some(k => h.includes(k.toLowerCase()) || k.toLowerCase().includes(h)));
+          };
+
+          const idIdx = getColIndex(['mã số', 'id', 'ma so', 'mã']);
+          const nameIdx = getColIndex(['họ và tên', 'name', 'ho va ten', 'tên', 'ho & ten']);
+          const genderIdx = getColIndex(['giới tính', 'gender', 'gioi tinh', 'giới']);
+          const genIdx = getColIndex(['đời thứ', 'generation', 'doi thu', 'đời']);
+          const roleIdx = getColIndex(['vai trò', 'role', 'vai tro', 'danh xưng']);
+          const birthIdx = getColIndex(['năm sinh', 'birthyear', 'nam sinh', 'sinh']);
+          const deathIdx = getColIndex(['năm mất', 'deathyear', 'nam mat', 'mất', 'mat']);
+          const deceasedIdx = getColIndex(['đã mất', 'isdeceased', 'da mat', 'deceased']);
+          const parentIdx = getColIndex(['mã cha', 'parentid', 'ma cha', 'cha']);
+          const motherIdx = getColIndex(['mã mẹ', 'motherid', 'ma me', 'mẹ']);
+          const spouseIdx = getColIndex(['mã vợ/chồng', 'spouseid', 'vợ', 'chồng', 'spouse']);
+          const marriedIdx = getColIndex(['đã kết hôn', 'ismarried', 'da ket hon', 'kết hôn']);
+          const branchIdx = getColIndex(['chi nhánh', 'branch', 'chi nhanh', 'nhánh']);
+          const storyIdx = getColIndex(['tiểu sử', 'story', 'tieu su', 'ghi chú']);
+          const jobIdx = getColIndex(['nghề nghiệp', 'occupation', 'nghe nghiep']);
+          const addressIdx = getColIndex(['địa chỉ', 'address', 'dia chi', 'quê quán']);
+          const phoneIdx = getColIndex(['điện thoại', 'phone', 'dien thoai', 'sđt', 'sdt']);
+
+          const parsedMembers: FamilyMember[] = [];
+          for (let i = 1; i < rows.length; i++) {
+            const cols = rows[i] as any[];
+            if (!cols || cols.length === 0 || cols.every(c => c === null || c === undefined || c === '')) continue;
+
+            const getColVal = (idx: number): string => {
+              if (idx === -1 || idx >= cols.length) return '';
+              const val = cols[idx];
+              return val !== null && val !== undefined ? String(val).trim() : '';
+            };
+
+            const rawId = getColVal(idIdx);
+            const name = getColVal(nameIdx) || 'Khuyết danh';
+            const genderStr = getColVal(genderIdx).toLowerCase();
+            const isFemale = genderStr.includes('nữ') || genderStr.includes('female') || genderStr.includes('gái') || genderStr.startsWith('f') || genderStr === 'nu';
+            const gender = isFemale ? 'female' : 'male';
+
+            const genStr = getColVal(genIdx);
+            const generation = parseInt(genStr, 10) || 18;
+
+            const role = getColVal(roleIdx) || 'Thành viên';
+            const birthYear = getColVal(birthIdx);
+            const deathYear = getColVal(deathIdx);
+
+            const decStr = getColVal(deceasedIdx).toLowerCase();
+            const isDeceased = decStr.includes('true') || decStr.includes('có') || decStr.includes('đã mất') || decStr.includes('mất') || decStr.includes('qua đời') || decStr.includes('tạ thế') || decStr === '1' || decStr === 'x' || decStr === 'yes' || deathYear !== '';
+
+            const parentId = getColVal(parentIdx);
+            const motherId = getColVal(motherIdx);
+            const spouseId = getColVal(spouseIdx);
+
+            const marStr = getColVal(marriedIdx).toLowerCase();
+            const isMarried = marStr.includes('true') || marStr.includes('có') || marStr.includes('kết hôn') || marStr === '1' || marStr === 'x' || marStr === 'yes' || spouseId !== '';
+
+            const branch = getColVal(branchIdx) || 'Nhánh chính';
+            const story = getColVal(storyIdx);
+            const occupation = getColVal(jobIdx);
+            const address = getColVal(addressIdx);
+            const phone = getColVal(phoneIdx);
+
+            const cleanToSlug = (str: string): string => {
+              if (!str) return '';
+              return str
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/[đĐ]/g, 'd')
+                .replace(/[^a-z0-9\s-]/g, '')
+                .trim()
+                .replace(/\s+/g, '-');
+            };
+
+            const id = rawId || (name !== 'Khuyết danh' ? cleanToSlug(name) : '') || `m-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 4)}`;
+
+            parsedMembers.push({
+              id,
+              name,
+              gender,
+              generation,
+              role,
+              birthYear: birthYear || undefined,
+              deathYear: isDeceased ? (deathYear || undefined) : undefined,
+              isDeceased,
+              parentId: parentId || undefined,
+              motherId: motherId || undefined,
+              spouseId: spouseId || undefined,
+              isMarried: isMarried || undefined,
+              branch,
+              story: story || undefined,
+              occupation: occupation || undefined,
+              address: address || undefined,
+              phone: phone || undefined
+            });
+          }
+
+          if (parsedMembers.length === 0) {
+            throw new Error('Không phân tích được thành viên nào hợp lệ từ tệp Excel.');
+          }
+
+          setImportedMembers(parsedMembers);
+          setIsImportModalOpen(true);
+          setImportSuccess(`Đã nhận dạng thành công ${parsedMembers.length} thành viên từ tệp Excel của bạn!`);
+        } catch (err: any) {
+          setImportError(err.message || 'Lỗi đọc tệp Excel.');
+          alert(err.message || 'Lỗi đọc tệp Excel.');
+        }
+      };
+      reader.readAsArrayBuffer(file);
+      e.target.value = '';
+      return;
+    }
+
     // If it's CSV, parse it locally client-side
     if (file.name.endsWith('.csv')) {
       const reader = new FileReader();
