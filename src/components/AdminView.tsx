@@ -51,6 +51,7 @@ export default function AdminView({
   const [deathYear, setDeathYear] = useState('');
   const [isDeceased, setIsDeceased] = useState(false);
   const [parentId, setParentId] = useState('');
+  const [motherId, setMotherId] = useState('');
   const [spouseId, setSpouseId] = useState('');
   const [branch, setBranch] = useState('Chi Cụ Bà Hai');
   const [story, setStory] = useState('');
@@ -59,7 +60,9 @@ export default function AdminView({
   const [phone, setPhone] = useState('');
 
   const [originalParentId, setOriginalParentId] = useState('');
+  const [originalMotherId, setOriginalMotherId] = useState('');
   const [originalSpouseId, setOriginalSpouseId] = useState('');
+  const [isMarried, setIsMarried] = useState(false);
   const [relationNotes, setRelationNotes] = useState('');
 
   // Announcement Form Fields
@@ -103,6 +106,7 @@ export default function AdminView({
     setDeathYear('');
     setIsDeceased(false);
     setParentId('');
+    setMotherId('');
     setSpouseId('');
     setBranch('Chi Cụ Bà Hai');
     setStory('');
@@ -110,7 +114,9 @@ export default function AdminView({
     setAddress('');
     setPhone('');
     setOriginalParentId('');
+    setOriginalMotherId('');
     setOriginalSpouseId('');
+    setIsMarried(false);
     setRelationNotes('');
     setIsMemberModalOpen(true);
   };
@@ -126,6 +132,7 @@ export default function AdminView({
     setDeathYear(member.deathYear || '');
     setIsDeceased(member.isDeceased);
     setParentId(member.parentId || '');
+    setMotherId(member.motherId || '');
     setSpouseId(member.spouseId || '');
     setBranch(member.branch);
     
@@ -140,7 +147,9 @@ export default function AdminView({
     setAddress(member.address || '');
     setPhone(member.phone || '');
     setOriginalParentId(member.parentId || '');
+    setOriginalMotherId(member.motherId || '');
     setOriginalSpouseId(member.spouseId || '');
+    setIsMarried(member.isMarried || !!member.spouseId || false);
     setIsMemberModalOpen(true);
   };
 
@@ -155,6 +164,7 @@ export default function AdminView({
     setDeathYear(targetMember.deathYear || '');
     setIsDeceased(targetMember.isDeceased);
     setParentId(targetMember.parentId || '');
+    setMotherId(targetMember.motherId || '');
     setSpouseId(targetMember.spouseId || '');
     setBranch(targetMember.branch);
     
@@ -169,7 +179,9 @@ export default function AdminView({
     setAddress(targetMember.address || '');
     setPhone(targetMember.phone || '');
     setOriginalParentId(targetMember.parentId || '');
+    setOriginalMotherId(targetMember.motherId || '');
     setOriginalSpouseId(targetMember.spouseId || '');
+    setIsMarried(targetMember.isMarried || !!targetMember.spouseId || false);
   };
 
   // Bầu đoàn nhà cụ/ông/bác/anh calculations
@@ -207,7 +219,9 @@ export default function AdminView({
       deathYear: isDeceased ? (deathYear.trim() || undefined) : undefined,
       isDeceased,
       parentId: parentId || undefined,
+      motherId: motherId || undefined,
       spouseId: spouseId || undefined,
+      isMarried: isMarried || undefined,
       branch,
       story: relationNotes.trim() ? `${story.trim()} ||| ${relationNotes.trim()}` : story.trim() || undefined,
       occupation: occupation.trim() || undefined,
@@ -939,107 +953,188 @@ export default function AdminView({
                 )}
 
                 {/* Parent Link */}
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="font-bold text-[#6b4724]">Liên kết phụ thân (Cha):</label>
-                    <div className="flex gap-1.5 items-center">
-                      {parentId && (
-                        <div className="flex gap-1.5">
+                <div className="space-y-3.5">
+                  {/* Father Link */}
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="font-bold text-[#6b4724]">Liên kết phụ thân (Cha):</label>
+                      <div className="flex gap-1.5 items-center">
+                        {parentId && (
+                          <div className="flex gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const target = members.find(m => m.id === parentId);
+                                if (target) handleSwitchToMember(target);
+                              }}
+                              className="text-[10px] bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded hover:bg-amber-200 font-bold cursor-pointer"
+                            >
+                              Sửa Cha
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setParentId('')}
+                              className="text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded hover:bg-rose-200 font-bold cursor-pointer"
+                            >
+                              Xóa liên kết
+                            </button>
+                          </div>
+                        )}
+                        {parentId !== originalParentId && (
                           <button
                             type="button"
-                            onClick={() => {
-                              const target = members.find(m => m.id === parentId);
-                              if (target) handleSwitchToMember(target);
-                            }}
-                            className="text-[10px] bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded hover:bg-amber-200 font-bold cursor-pointer"
+                            onClick={() => setParentId(originalParentId)}
+                            className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded hover:bg-blue-200 font-bold cursor-pointer"
+                            title="Khôi phục liên kết gốc"
                           >
-                            Sửa Cha
+                            Undo (Hoàn tác)
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => setParentId('')}
-                            className="text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded hover:bg-rose-200 font-bold cursor-pointer"
-                          >
-                            Xóa liên kết
-                          </button>
-                        </div>
-                      )}
-                      {parentId !== originalParentId && (
-                        <button
-                          type="button"
-                          onClick={() => setParentId(originalParentId)}
-                          className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded hover:bg-blue-200 font-bold cursor-pointer"
-                          title="Khôi phục liên kết gốc"
-                        >
-                          Undo (Hoàn tác)
-                        </button>
-                      )}
+                        )}
+                      </div>
                     </div>
+                    <select
+                      value={parentId}
+                      onChange={(e) => setParentId(e.target.value)}
+                      className="w-full p-2 border border-[#d6b583] rounded bg-white cursor-pointer"
+                    >
+                      <option value="">-- Không có hoặc là Cụ tổ --</option>
+                      {members
+                        .filter(m => m.gender === 'male' && m.id !== (editingMember?.id || ''))
+                        .map(m => (
+                          <option key={m.id} value={m.id}>{m.name} (Đời {m.generation})</option>
+                        ))}
+                    </select>
                   </div>
-                  <select
-                    value={parentId}
-                    onChange={(e) => setParentId(e.target.value)}
-                    className="w-full p-2 border border-[#d6b583] rounded bg-white"
-                  >
-                    <option value="">-- Không có hoặc là Cụ tổ --</option>
-                    {members
-                      .filter(m => m.gender === 'male' && m.id !== (editingMember?.id || ''))
-                      .map(m => (
-                        <option key={m.id} value={m.id}>{m.name} (Đời {m.generation})</option>
-                      ))}
-                  </select>
+
+                  {/* Mother Link (Thêm tính năng liên mẫu thân (Mẹ) vào ô đỏ dài dưới ô Liên kết thân phụ) */}
+                  <div className="pt-2 border-t border-dashed border-amber-200">
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="font-bold text-[#6b4724]">Liên kết mẫu thân (Mẹ):</label>
+                      <div className="flex gap-1.5 items-center">
+                        {motherId && (
+                          <div className="flex gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const target = members.find(m => m.id === motherId);
+                                if (target) handleSwitchToMember(target);
+                              }}
+                              className="text-[10px] bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded hover:bg-amber-200 font-bold cursor-pointer"
+                            >
+                              Sửa Mẹ
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setMotherId('')}
+                              className="text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded hover:bg-rose-200 font-bold cursor-pointer"
+                            >
+                              Xóa liên kết
+                            </button>
+                          </div>
+                        )}
+                        {motherId !== originalMotherId && (
+                          <button
+                            type="button"
+                            onClick={() => setMotherId(originalMotherId)}
+                            className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded hover:bg-blue-200 font-bold cursor-pointer"
+                            title="Khôi phục liên kết gốc"
+                          >
+                            Undo (Hoàn tác)
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <select
+                      value={motherId}
+                      onChange={(e) => setMotherId(e.target.value)}
+                      className="w-full p-2 border border-rose-200 rounded bg-white cursor-pointer text-rose-950 font-medium"
+                    >
+                      <option value="">-- Không có hoặc Chưa rõ mẫu thân --</option>
+                      {members
+                        .filter(m => m.gender === 'female' && m.id !== (editingMember?.id || ''))
+                        .map(m => (
+                          <option key={m.id} value={m.id}>{m.name} (Đời {m.generation})</option>
+                        ))}
+                    </select>
+                  </div>
                 </div>
 
                 {/* Spouse Link */}
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="font-bold text-[#6b4724]">Liên kết hôn phối (Vợ / Chồng):</label>
-                    <div className="flex gap-1.5 items-center">
-                      {spouseId && (
-                        <div className="flex gap-1.5">
+                <div className="flex flex-col justify-between h-full">
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="font-bold text-[#6b4724] flex items-center gap-1.5 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={isMarried}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setIsMarried(checked);
+                            if (!checked) {
+                              setSpouseId('');
+                            }
+                          }}
+                          className="rounded text-rose-600 border-[#d6b583] focus:ring-rose-400 w-4.5 h-4.5 cursor-pointer accent-rose-600"
+                        />
+                        <span>Liên kết hôn phối (Vợ / Chồng):</span>
+                      </label>
+                      <div className="flex gap-1.5 items-center">
+                        {spouseId && (
+                          <div className="flex gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const target = members.find(m => m.id === spouseId);
+                                if (target) handleSwitchToMember(target);
+                              }}
+                              className="text-[10px] bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded hover:bg-amber-200 font-bold cursor-pointer"
+                            >
+                              Sửa Vợ/Chồng
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setSpouseId('')}
+                              className="text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded hover:bg-rose-200 font-bold cursor-pointer"
+                            >
+                              Xóa liên kết
+                            </button>
+                          </div>
+                        )}
+                        {spouseId !== originalSpouseId && (
                           <button
                             type="button"
-                            onClick={() => {
-                              const target = members.find(m => m.id === spouseId);
-                              if (target) handleSwitchToMember(target);
-                            }}
-                            className="text-[10px] bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded hover:bg-amber-200 font-bold cursor-pointer"
+                            onClick={() => setSpouseId(originalSpouseId)}
+                            className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded hover:bg-blue-200 font-bold cursor-pointer"
+                            title="Khôi phục liên kết hôn phối gốc"
                           >
-                            Sửa Vợ/Chồng
+                            Undo (Hoàn tác)
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => setSpouseId('')}
-                            className="text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded hover:bg-rose-200 font-bold cursor-pointer"
-                          >
-                            Xóa liên kết
-                          </button>
-                        </div>
-                      )}
-                      {spouseId !== originalSpouseId && (
-                        <button
-                          type="button"
-                          onClick={() => setSpouseId(originalSpouseId)}
-                          className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded hover:bg-blue-200 font-bold cursor-pointer"
-                          title="Khôi phục liên kết hôn phối gốc"
-                        >
-                          Undo (Hoàn tác)
-                        </button>
-                      )}
+                        )}
+                      </div>
                     </div>
+                    <select
+                      value={spouseId}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setSpouseId(val);
+                        if (val) {
+                          setIsMarried(true);
+                        }
+                      }}
+                      className="w-full p-2 border border-[#d6b583] rounded bg-white cursor-pointer"
+                    >
+                      <option value="">-- Chưa kết hôn / độc thân --</option>
+                      {members
+                        .filter(m => m.id !== (editingMember?.id || ''))
+                        .map(m => (
+                          <option key={m.id} value={m.id}>{m.name} (Đời {m.generation})</option>
+                        ))}
+                    </select>
                   </div>
-                  <select
-                    value={spouseId}
-                    onChange={(e) => setSpouseId(e.target.value)}
-                    className="w-full p-2 border border-[#d6b583] rounded bg-white"
-                  >
-                    <option value="">-- Chưa kết hôn / độc thân --</option>
-                    {members
-                      .filter(m => m.id !== (editingMember?.id || ''))
-                      .map(m => (
-                        <option key={m.id} value={m.id}>{m.name} (Đời {m.generation})</option>
-                      ))}
-                  </select>
+                  {/* Visual marriage decoration helper */}
+                  <div className="hidden md:block text-[11px] text-rose-800 italic mt-auto bg-rose-50/50 border border-rose-100 p-2 rounded-lg">
+                    {isMarried ? "❤️ Đã chọn trạng thái Có kết hôn. Vui lòng liên kết Vợ/Chồng hoặc ghi thông tin Dâu ở phần Ghi chú." : "🕊️ Trạng thái Độc thân hoặc Chưa liên kết hôn phối."}
+                  </div>
                 </div>
 
                 {/* Bầu đoàn dòng tộc card */}

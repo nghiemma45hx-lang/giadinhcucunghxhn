@@ -8,8 +8,10 @@ export interface FamilyMember {
   deathYear?: string;
   isDeceased: boolean;
   parentId?: string; // Links to parent (usually father)
+  motherId?: string; // Links to mother
   spouseId?: string; // Main spouse ID
   spouseIds?: string[]; // Supports multiple spouses
+  isMarried?: boolean; // Tích chọn vào liên kết hôn phối
   branch: string; // "Nhánh chính", "Chi Cụ Bà Cả", "Chi Cụ Bà Hai", etc.
   story?: string;
   occupation?: string;
