@@ -6,13 +6,16 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import { initialMembers, initialAnnouncements } from "./src/data/familyData";
+import * as XLSX from "xlsx";
+import mammoth from "mammoth";
 
 dotenv.config();
 
 const app = express();
 const PORT = 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // Helper to clean environment variables from quotes or placeholders
 const cleanEnvVar = (val: string | undefined): string | undefined => {
@@ -134,6 +137,642 @@ function isTableMissingError(error: any): boolean {
     message.includes("not found")
   );
 }
+
+// --- TEMPLATES & DOCUMENT PARSER ENDPOINTS ---
+// Endpoint to download properly formatted templates (Excel, Word, PDF)
+app.get("/api/templates/download", (req, res) => {
+  const format = req.query.format;
+
+  if (format === "excel") {
+    try {
+      const headers = [
+        "Mã số (id)", "Họ và tên (name)", "Giới tính (gender: male/female)", 
+        "Đời thứ (generation)", "Vai trò (role)", "Năm sinh (birthYear)", 
+        "Năm mất (deathYear)", "Đã mất (isDeceased: true/false)", 
+        "Mã cha (parentId)", "Mã mẹ (motherId)", "Mã vợ/chồng (spouseId)", 
+        "Đã kết hôn (isMarried: true/false)", "Chi nhánh (branch)", 
+        "Tiểu sử (story)", "Nghề nghiệp (occupation)", "Địa chỉ (address)", "Số điện thoại (phone)"
+      ];
+
+      const rows = [
+        [
+          "nghiem-dieu", "Nghiêm Điều (Chu)", "male", 15, "CỤ CỐ ÔNG", 
+          "1875", "1945", true, "", "", "cu-ba-lun", true, "Nhánh chính", 
+          "Cụ cố khởi tổ sinh cơ lập nghiệp tại Hòa Xá...", "Nông nghiệp", "Hòa Xá, Ứng Hòa, Hà Nội", ""
+        ],
+        [
+          "cu-ba-lun", "Đỗ Thị Lùn", "female", 15, "CỤ CỐ BÀ", 
+          "1880", "1952", true, "", "", "nghiem-dieu", true, "Nhánh chính", 
+          "Cụ cố bà hiền từ đảm đang gánh vác việc gia đình...", "Nội trợ", "Hòa Xá, Ứng Hòa, Hà Nội", ""
+        ],
+        [
+          "nghiem-cung", "Nghiêm Cung", "male", 16, "CỤ ÔNG TRỤ CỘT", 
+          "1902", "1978", true, "nghiem-dieu", "cu-ba-lun", "", false, "Nhánh chính", 
+          "Y sĩ đông y nổi tiếng trong vùng Hòa Xá, bốc thuốc cứu người...", "Đông y", "Hòa Xá, Ứng Hòa, Hà Nội", "0901234567"
+        ]
+      ];
+
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+
+      // Set nice column widths for Excel
+      const wscols = [
+        { wch: 15 }, // id
+        { wch: 25 }, // name
+        { wch: 12 }, // gender
+        { wch: 10 }, // generation
+        { wch: 15 }, // role
+        { wch: 12 }, // birthYear
+        { wch: 12 }, // deathYear
+        { wch: 10 }, // isDeceased
+        { wch: 15 }, // parentId
+        { wch: 15 }, // motherId
+        { wch: 15 }, // spouseId
+        { wch: 12 }, // isMarried
+        { wch: 15 }, // branch
+        { wch: 40 }, // story
+        { wch: 15 }, // occupation
+        { wch: 30 }, // address
+        { wch: 15 }  // phone
+      ];
+      ws["!cols"] = wscols;
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "GiaPhaTemplate");
+
+      const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+
+      res.setHeader("Content-Disposition", "attachment; filename=bieu_mau_nhap_gia_pha_excel.xlsx");
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      return res.send(buf);
+    } catch (error: any) {
+      console.error("Excel template generation error:", error);
+      return res.status(500).json({ error: "Không thể tạo biểu mẫu Excel: " + error.message });
+    }
+  }
+
+  if (format === "docx") {
+    try {
+      const htmlDoc = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: 'Times New Roman', Times, serif; line-height: 1.6; margin: 1in; color: #333333; }
+            h1 { text-align: center; color: #5d4037; font-size: 20pt; margin-bottom: 5pt; font-weight: bold; }
+            .subtitle { text-align: center; font-style: italic; color: #555555; font-size: 11pt; margin-bottom: 25pt; }
+            h2 { color: #8b7355; font-size: 14pt; border-bottom: 2px solid #b8956b; padding-bottom: 3px; margin-top: 25pt; font-weight: bold; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10pt; margin-bottom: 15pt; }
+            th, td { border: 1px solid #d6b583; padding: 10px; text-align: left; font-size: 10pt; }
+            th { background-color: #fdfbf7; font-weight: bold; color: #5d4037; }
+            .note-box { background-color: #fffde7; border-left: 4px solid #fbc02d; padding: 10px; margin: 15pt 0; font-size: 9.5pt; color: #5d4037; }
+            .sample-narrative { background-color: #fafafa; border: 1px dashed #cccccc; padding: 12px; font-size: 10pt; line-height: 1.5; color: #444444; }
+          </style>
+        </head>
+        <body>
+          <h1>MẪU SOẠN THẢO GIA PHẢ - GIA TỘC NGHIÊM CUNG</h1>
+          <div class="subtitle">Dành cho việc số hóa sơ đồ phả hệ tự động bằng Trí tuệ Nhân tạo (AI)</div>
+          
+          <div class="note-box">
+            <strong>⚠️ HƯỚNG DẪN QUAN TRỌNG:</strong><br/>
+            Hệ thống AI thông minh của chúng tôi có khả năng đọc hiểu trực tiếp tệp Word văn bản này. Quý ban biên soạn dòng họ có thể chọn một trong hai cách soạn thảo bên dưới:
+            <br/>- <strong>Cách 1:</strong> Điền thông tin thành viên chi tiết vào Bảng cấu trúc mục II.
+            <br/>- <strong>Cách 2:</strong> Viết lời kể chuyện, mô tả chi tiết các cụ và mối quan hệ gia tộc ở mục III. AI sẽ tự đọc hiểu và liên kết thành sơ đồ phả hệ!
+          </div>
+
+          <h2>I. THÔNG TIN CHUNG</h2>
+          <p><strong>Dòng họ:</strong> Nghiêm Cung (Hòa Xá, Ứng Hòa, Hà Nội)</p>
+          <p><strong>Người đóng góp/Biên soạn:</strong> ............................................................</p>
+          <p><strong>Ngày lập bản mẫu:</strong> Ngày ...... tháng ...... năm 2026</p>
+
+          <h2>II. BẢNG THÔNG TIN THÀNH VIÊN GIA TỘC (MẪU CẤU TRÚC)</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Mã số (ID)*</th>
+                <th>Họ và tên*</th>
+                <th>Giới tính (Nam/Nữ)*</th>
+                <th>Đời thứ*</th>
+                <th>Vai trò/Danh xưng</th>
+                <th>Năm sinh</th>
+                <th>Năm mất</th>
+                <th>Mã cha (hoặc mẹ)</th>
+                <th>Quê quán/Địa chỉ</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>nghiem-dieu</td>
+                <td>Nghiêm Điều (Chu)</td>
+                <td>Nam</td>
+                <td>15</td>
+                <td>CỤ CỐ ÔNG</td>
+                <td>1875</td>
+                <td>1945</td>
+                <td>(Khởi tổ)</td>
+                <td>Hòa Xá, Ứng Hòa, Hà Nội</td>
+              </tr>
+              <tr>
+                <td>cu-ba-lun</td>
+                <td>Đỗ Thị Lùn</td>
+                <td>Nữ</td>
+                <td>15</td>
+                <td>CỤ CỐ BÀ</td>
+                <td>1880</td>
+                <td>1952</td>
+                <td></td>
+                <td>Hòa Xá, Ứng Hòa, Hà Nội</td>
+              </tr>
+              <tr>
+                <td>nghiem-cung</td>
+                <td>Nghiêm Cung</td>
+                <td>Nam</td>
+                <td>16</td>
+                <td>CỤ ÔNG TRỤ CỘT</td>
+                <td>1902</td>
+                <td>1978</td>
+                <td>nghiem-dieu</td>
+                <td>Hòa Xá, Ứng Hòa, Hà Nội</td>
+              </tr>
+              <tr>
+                <td>[Điền mã tiếp theo]</td>
+                <td>[Họ tên thành viên]</td>
+                <td>[Nam/Nữ]</td>
+                <td>[Đời thứ]</td>
+                <td>[Danh xưng dòng họ]</td>
+                <td>[Năm sinh]</td>
+                <td>[Năm mất]</td>
+                <td>[Mã người cha]</td>
+                <td>[Quê quán]</td>
+              </tr>
+            </tbody>
+          </table>
+          <p style="font-size: 9pt; color: #777777;">* Ghi chú: Mã số (ID) viết liền không dấu, ví dụ: 'nghiem-cung-con-ca', 'nghiem-ha', dùng để liên kết các cụ với nhau thông qua trường Mã cha.</p>
+
+          <h2>III. TIỂU SỬ CHI TIẾT / LỜI KỂ PHẢ HỆ DẠNG VĂN BẢN (MẪU)</h2>
+          <div class="sample-narrative">
+            Cụ ông Nghiêm Điều (Chu) kết hôn với cụ bà Đỗ Thị Lùn. Hai cụ sinh cơ lập nghiệp tại vùng quê Hòa Xá, nổi tiếng nhân đức đảm đang.
+            Cụ ông sinh năm 1875, qua đời năm 1945. Cụ bà sinh năm 1880, qua đời năm 1952. 
+            Hai cụ hạ sinh được cụ Nghiêm Cung (sinh năm 1902, mất năm 1978), tức cụ ông đời thứ 16 kế nghiệp gia phong dòng họ Nghiêm...
+            [Quý vị vui lòng viết tiếp lịch sử gia đình, lời giới thiệu dòng họ ở đây để AI trích xuất]
+          </div>
+        </body>
+        </html>
+      `;
+
+      res.setHeader("Content-Disposition", "attachment; filename=bieu_mau_nhap_gia_pha_word.doc");
+      res.setHeader("Content-Type", "application/msword");
+      return res.send(htmlDoc);
+    } catch (error: any) {
+      console.error("Docx template generation error:", error);
+      return res.status(500).json({ error: "Không thể tạo biểu mẫu Word: " + error.message });
+    }
+  }
+
+  if (format === "pdf") {
+    try {
+      const pdfHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Biểu Mẫu Soạn Thảo Gia Phả Họ Nghiêm</title>
+          <style>
+            @media print {
+              body { margin: 0; padding: 0; background: white; font-size: 11pt; }
+              .no-print { display: none; }
+              .page-break { page-break-before: always; }
+            }
+            body {
+              font-family: 'Times New Roman', Times, serif;
+              line-height: 1.6;
+              color: #2b1b0c;
+              background-color: #faf7f2;
+              margin: 0;
+              padding: 40px;
+            }
+            .container {
+              max-width: 800px;
+              margin: 0 auto;
+              background: white;
+              padding: 50px 60px;
+              border: 1px solid #e2d3be;
+              box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+              position: relative;
+            }
+            .container::before {
+              content: "";
+              position: absolute;
+              top: 15px; left: 15px; right: 15px; bottom: 15px;
+              border: 1px solid #b8956b;
+              pointer-events: none;
+              opacity: 0.5;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 30px;
+              border-bottom: 2px double #b8956b;
+              padding-bottom: 20px;
+            }
+            .header h1 {
+              font-size: 22pt;
+              margin: 0 0 10px 0;
+              color: #5d4037;
+              font-weight: bold;
+              text-transform: uppercase;
+              letter-spacing: 1px;
+            }
+            .header p {
+              margin: 5px 0;
+              font-style: italic;
+              color: #6d4c41;
+              font-size: 11pt;
+            }
+            h2 {
+              color: #5d4037;
+              font-size: 14pt;
+              border-bottom: 1px solid #d6b583;
+              padding-bottom: 5px;
+              margin-top: 25px;
+              text-transform: uppercase;
+              font-weight: bold;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin: 15px 0;
+            }
+            th, td {
+              border: 1px solid #d6b583;
+              padding: 8px 10px;
+              text-align: left;
+              font-size: 10pt;
+            }
+            th {
+              background-color: #fbf8f3;
+              color: #5d4037;
+              font-weight: bold;
+            }
+            .guidelines {
+              background-color: #fffde7;
+              border-left: 4px solid #fbc02d;
+              padding: 12px 15px;
+              margin: 20px 0;
+              font-size: 10pt;
+              border-radius: 4px;
+            }
+            .footer {
+              margin-top: 50px;
+              text-align: center;
+              font-size: 9.5pt;
+              color: #777777;
+              border-top: 1px dashed #d6b583;
+              padding-top: 15px;
+            }
+            .no-print-bar {
+              max-width: 800px;
+              margin: 0 auto 20px auto;
+              background: #5d4037;
+              color: white;
+              padding: 12px 20px;
+              border-radius: 8px;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              font-family: system-ui, sans-serif;
+              font-size: 13px;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            }
+            .print-btn {
+              background: #b8956b;
+              color: white;
+              border: none;
+              padding: 8px 16px;
+              border-radius: 4px;
+              font-weight: bold;
+              cursor: pointer;
+              transition: background 0.2s;
+            }
+            .print-btn:hover {
+              background: #a37f55;
+            }
+          </style>
+        </head>
+        <body onload="window.print()">
+          <div class="no-print-bar no-print">
+            <span><strong>🖨️ TRÌNH IN BIỂU MẪU PDF GIA PHẢ:</strong> Bản mẫu hiển thị chuẩn kích thước vector để in hoặc xuất PDF.</span>
+            <button class="print-btn" onclick="window.print()">In / Xuất PDF</button>
+          </div>
+
+          <div class="container">
+            <div class="header">
+              <h1>BIỂU MẪU BIÊN SOẠN GIA PHẢ</h1>
+              <p>Hội Đồng Gia Tộc Nghiêm Cung — Hòa Xá, Ứng Hòa, Hà Nội</p>
+              <p>Mẫu chuẩn số hóa sơ đồ cây phả hệ trực tuyến</p>
+            </div>
+
+            <div class="guidelines">
+              <strong>📖 HƯỚNG DẪN BIÊN CHÉP GIA PHẢ:</strong><br/>
+              Kính gửi các bậc cao niên và ban khánh tiết dòng họ, để việc dựng cây phả hệ số hóa được chính xác 100%, xin vui lòng điền các cụ tiền nhân vào Bảng Danh sách dưới đây hoặc cung cấp bản viết tay, tư liệu bằng văn bản lịch sử.
+              Hệ thống AI sẽ tự động đọc hiểu các mối liên kết (Cha - Con, Vợ - Chồng) từ tài liệu này!
+            </div>
+
+            <h2>I. THÔNG TIN NGƯỜI ĐÓNG GÓP TƯ LIỆU</h2>
+            <p>Họ tên: ........................................................................ Điện thoại: .............................................</p>
+            <p>Thuộc chi ngành: ........................................................... Địa chỉ hiện tại: .......................................</p>
+
+            <h2>II. SƠ ĐỒ ĐẠI DIỆN BA ĐỜI KHỞI TỔ (MẪU THAM KHẢO)</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 15%">Mã số (ID)</th>
+                  <th style="width: 25%">Họ và Tên các cụ</th>
+                  <th style="width: 10%">Đời thứ</th>
+                  <th style="width: 15%">Danh xưng</th>
+                  <th style="width: 20%">Mối quan hệ</th>
+                  <th style="width: 15%">Năm sinh/mất</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>nghiem-dieu</strong></td>
+                  <td>Nghiêm Điều (Chu)</td>
+                  <td>Đời 15</td>
+                  <td>CỤ CỐ ÔNG</td>
+                  <td>Khởi tổ dòng họ</td>
+                  <td>1875 - 1945</td>
+                </tr>
+                <tr>
+                  <td><strong>cu-ba-lun</strong></td>
+                  <td>Đỗ Thị Lùn</td>
+                  <td>Đời 15</td>
+                  <td>CỤ CỐ BÀ</td>
+                  <td>Vợ cụ Nghiêm Điều</td>
+                  <td>1880 - 1952</td>
+                </tr>
+                <tr>
+                  <td><strong>nghiem-cung</strong></td>
+                  <td>Nghiêm Cung</td>
+                  <td>Đời 16</td>
+                  <td>CỤ ÔNG TRỤ CỘT</td>
+                  <td>Con cụ Nghiêm Điều</td>
+                  <td>1902 - 1978</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <h2>III. DANH SÁCH THÀNH VIÊN CẦN THÊM MỚI</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th style="height: 25px;">Họ và Tên</th>
+                  <th>Giới tính</th>
+                  <th>Đời</th>
+                  <th>Tên Cha / Mẹ</th>
+                  <th>Tên Vợ / Chồng</th>
+                  <th>Năm sinh/mất</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td style="height: 30px;"></td><td></td><td></td><td></td><td></td><td></td></tr>
+                <tr><td style="height: 30px;"></td><td></td><td></td><td></td><td></td><td></td></tr>
+                <tr><td style="height: 30px;"></td><td></td><td></td><td></td><td></td><td></td></tr>
+                <tr><td style="height: 30px;"></td><td></td><td></td><td></td><td></td><td></td></tr>
+                <tr><td style="height: 30px;"></td><td></td><td></td><td></td><td></td><td></td></tr>
+              </tbody>
+            </table>
+
+            <h2>IV. LỊCH SỬ DÒNG HỌ / TIỂU SỬ CHI TIẾT (VIẾT TAY)</h2>
+            <p style="border-bottom: 1px dotted #ccc; height: 35px;"></p>
+            <p style="border-bottom: 1px dotted #ccc; height: 35px;"></p>
+            <p style="border-bottom: 1px dotted #ccc; height: 35px;"></p>
+            <p style="border-bottom: 1px dotted #ccc; height: 35px;"></p>
+
+            <div class="footer">
+              <p>Mẫu hồ sơ phả hệ Nghiêm Cung Gia Tộc — Uống nước nhớ nguồn, ngàn năm thịnh hưng</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.send(pdfHtml);
+    } catch (error: any) {
+      console.error("PDF template generation error:", error);
+      return res.status(500).json({ error: "Không thể tạo biểu mẫu PDF: " + error.message });
+    }
+  }
+
+  return res.status(400).json({ error: "Định dạng không hợp lệ. Chỉ hỗ trợ excel, docx, pdf" });
+});
+
+// Endpoint to parse uploaded files (.xlsx, .xls, .csv, .docx, .pdf) using Mammoth & Gemini
+app.post("/api/members/parse-document", async (req, res) => {
+  try {
+    const { base64, fileName, mimeType } = req.body;
+
+    if (!base64) {
+      return res.status(400).json({ error: "Thiếu dữ liệu tệp tải lên (Base64)" });
+    }
+
+    const buffer = Buffer.from(base64, "base64");
+    const nameLower = (fileName || "").toLowerCase();
+
+    // 1. Process Excel / CSV directly using xlsx package
+    if (nameLower.endsWith(".xlsx") || nameLower.endsWith(".xls") || nameLower.endsWith(".csv")) {
+      try {
+        const workbook = XLSX.read(buffer, { type: "buffer" });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(sheet) as any[];
+
+        if (rows.length === 0) {
+          return res.status(400).json({ error: "Tệp Excel trống hoặc không đúng cấu trúc dòng cột." });
+        }
+
+        // Helper: Find value from multiple possible header keys
+        const findVal = (row: any, keys: string[]): string => {
+          for (const k of keys) {
+            const rowKeys = Object.keys(row);
+            const foundKey = rowKeys.find(rk => 
+              rk.toLowerCase().trim() === k.toLowerCase() || 
+              rk.toLowerCase().includes(k.toLowerCase())
+            );
+            if (foundKey) return String(row[foundKey] || "").trim();
+          }
+          return "";
+        };
+
+        const parsedMembers = rows.map((r, idx) => {
+          const id = findVal(r, ["id", "mã số", "ma so", "mã"]);
+          const name = findVal(r, ["name", "họ và tên", "ho va ten", "họ & tên", "ho & ten", "tên"]);
+          const genderStr = findVal(r, ["gender", "giới tính", "gioi tinh"]).toLowerCase();
+          const gender = genderStr.includes("nữ") || genderStr.includes("female") ? "female" : "male";
+          
+          const genStr = findVal(r, ["generation", "đời thứ", "doi thu", "đời", "doi"]);
+          const generation = parseInt(genStr) || 18;
+          
+          const role = findVal(r, ["role", "vai trò", "vai tro", "danh xưng"]);
+          const birthYear = findVal(r, ["birthyear", "năm sinh", "nam sinh", "sinh"]);
+          const deathYear = findVal(r, ["deathyear", "năm mất", "nam mat", "mất", "mat"]);
+          const deceasedStr = findVal(r, ["isdeceased", "đã mất", "da mat", "deceased"]).toLowerCase();
+          const isDeceased = deceasedStr.includes("true") || deceasedStr.includes("có") || deceasedStr.includes("đã mất") || deathYear !== "";
+          
+          const parentId = findVal(r, ["parentid", "mã cha", "ma cha", "cha"]);
+          const motherId = findVal(r, ["motherid", "mã mẹ", "ma me", "mẹ"]);
+          const spouseId = findVal(r, ["spouseid", "mã vợ/chồng", "vợ", "chồng", "ma vo", "ma chong"]);
+          const marriedStr = findVal(r, ["ismarried", "đã kết hôn", "da ket hon", "kết hôn", "ket hon"]).toLowerCase();
+          const isMarried = marriedStr.includes("true") || marriedStr.includes("có") || spouseId !== "";
+          
+          const branch = findVal(r, ["branch", "chi nhánh", "chi nhanh", "phân chi"]) || "Nhánh chính";
+          const story = findVal(r, ["story", "tiểu sử", "tieu su", "ghi chú"]);
+          const occupation = findVal(r, ["occupation", "nghề nghiệp", "nghe nghiep"]);
+          const address = findVal(r, ["address", "địa chỉ", "dia chi", "quê quán"]);
+          const phone = findVal(r, ["phone", "điện thoại", "dien thoai", "sđt", "sdt"]);
+
+          return {
+            id: id || `m-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 4)}`,
+            name: name || "Thành viên gia phả",
+            gender,
+            generation,
+            role: role || "Thành viên",
+            birthYear: birthYear || undefined,
+            deathYear: isDeceased ? (deathYear || undefined) : undefined,
+            isDeceased,
+            parentId: parentId || undefined,
+            motherId: motherId || undefined,
+            spouseId: spouseId || undefined,
+            isMarried: isMarried || undefined,
+            branch: branch || "Nhánh chính",
+            story: story || undefined,
+            occupation: occupation || undefined,
+            address: address || undefined,
+            phone: phone || undefined
+          };
+        });
+
+        return res.json({ success: true, count: parsedMembers.length, data: parsedMembers });
+      } catch (err: any) {
+        console.error("Excel server parsing error:", err);
+        return res.status(500).json({ error: "Lỗi phân tích tệp Excel: " + err.message });
+      }
+    }
+
+    // 2. Process Word and PDF using Gemini API
+    const key = process.env.GEMINI_API_KEY;
+    if (!key) {
+      return res.status(400).json({ 
+        error: "Để phân tích tài liệu Word (.docx) hoặc PDF tự động bằng Trí tuệ Nhân tạo (AI), quý quản trị viên vui lòng truy cập Settings và cấu hình khóa GEMINI_API_KEY. Hệ thống vẫn cho phép tải/nhập tệp Excel (.xlsx, .csv) bình thường không cần API Key." 
+      });
+    }
+
+    let extractedText = "";
+
+    if (nameLower.endsWith(".docx")) {
+      try {
+        const result = await mammoth.extractRawText({ buffer });
+        extractedText = result.value;
+        if (!extractedText.trim()) {
+          return res.status(400).json({ error: "Tài liệu Word rỗng hoặc không trích xuất được văn bản thô." });
+        }
+      } catch (err: any) {
+        console.error("Mammoth docx extraction error:", err);
+        return res.status(500).json({ error: "Lỗi trích xuất văn bản từ tệp Word: " + err.message });
+      }
+    }
+
+    // Setup prompt for AI
+    const systemPrompt = "Bạn là trợ lý ảo chuyên nghiệp số hóa gia phả, tư liệu dòng họ Nghiêm. Nhiệm vụ của bạn là trích xuất chính xác danh sách các thành viên gia tộc từ tài liệu lịch sử gia phả thành mảng JSON đúng chuẩn.";
+    
+    const userPrompt = `Hãy đọc tài liệu lịch sử dòng họ đính kèm và trích xuất danh sách tất cả các thành viên gia tộc được nhắc tới.
+Mỗi thành viên được trích xuất bắt buộc phải có cấu trúc khớp hoàn toàn với kiểu dữ liệu FamilyMember sau đây:
+{
+  "id": "chuỗi định danh duy nhất viết liền không dấu gạch ngang hoặc gạch dưới nối chữ, ví dụ: 'nghiem-cung', tự sinh thông minh từ tên nếu không có sẵn",
+  "name": "Họ và tên cụ thể của thành viên",
+  "gender": "male" hoặc "female",
+  "generation": số đời thứ mấy trong phả hệ (ví dụ: 15, 16, 17, 18, nếu không rõ hãy tính toán ước lượng từ mối quan hệ thế hệ trước/sau hoặc điền số hợp lý)",
+  "role": "danh xưng tôn kính dòng họ, ví dụ: CỤ CỐ ÔNG, CỤ CỐ BÀ, CỤ ÔNG, CỤ BÀ, Trưởng họ, Thành viên",
+  "birthYear": "năm sinh dạng chuỗi, ví dụ: '1902' hoặc để trống nếu chưa rõ",
+  "deathYear": "năm mất dạng chuỗi, ví dụ: '1978' hoặc để trống nếu còn sống hoặc chưa rõ",
+  "isDeceased": true hoặc false (nếu có năm mất hoặc được ghi là đã mất/đã qua đời thì ghi true, còn lại để false)",
+  "parentId": "id của người cha (hoặc mẹ) để liên kết phả hệ, cực kỳ quan trọng",
+  "motherId": "id của người mẹ (nếu xác định được)",
+  "spouseId": "id của người vợ hoặc chồng",
+  "isMarried": true hoặc false (nếu có spouseId hoặc ghi có vợ có chồng thì là true)",
+  "branch": "chi nhánh, phân chi dòng họ, ví dụ: 'Nhánh chính' hoặc tên nhánh tương ứng trong văn bản",
+  "story": "mô tả tóm tắt đóng góp, công trạng, chức vị, sự tích hoặc thông tin nổi bật của cụ/thành viên nếu có",
+  "occupation": "nghề nghiệp hoạt động tiêu biểu của họ",
+  "address": "nơi cư trú hoặc quê quán",
+  "phone": "số điện thoại liên lạc"
+}
+
+Yêu cầu kỹ thuật:
+1. Hãy phân tích các mối liên kết Cha - Con, Vợ - Chồng cẩn thận để gán trường 'parentId', 'spouseId' chính xác nhất giúp vẽ cây phả hệ đúng cấu trúc.
+2. Trả về DUY NHẤT một mảng JSON hợp lệ [ { ... }, ... ]. Tuyệt đối KHÔNG bọc trong khối code markdown \`\`\`json, không giải thích gì thêm, không viết chữ thừa ngoài mảng JSON.`;
+
+    const ai = getAIClient();
+    let responseText = "";
+
+    if (nameLower.endsWith(".docx")) {
+      // Send extracted text to Gemini
+      const docxPrompt = `${userPrompt}\n\nNỘI DUNG VĂN BẢN TRÍCH XUẤT TỪ FILE WORD:\n${extractedText}`;
+      const aiResponse = await ai.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: docxPrompt,
+        config: {
+          systemInstruction: systemPrompt
+        }
+      });
+      responseText = aiResponse.text || "";
+    } else if (nameLower.endsWith(".pdf")) {
+      // Send PDF directly to Gemini
+      const aiResponse = await ai.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: [
+          {
+            inlineData: {
+              mimeType: "application/pdf",
+              data: base64
+            }
+          },
+          userPrompt
+        ],
+        config: {
+          systemInstruction: systemPrompt
+        }
+      });
+      responseText = aiResponse.text || "";
+    } else {
+      return res.status(400).json({ error: "Định dạng tệp không được hỗ trợ để phân tích AI. Chỉ chấp nhận .docx, .pdf" });
+    }
+
+    // Clean JSON response from Gemini
+    let cleanedText = responseText.trim();
+    if (cleanedText.startsWith("```")) {
+      cleanedText = cleanedText.replace(/^```json\s*/i, "");
+      cleanedText = cleanedText.replace(/^```\s*/, "");
+      cleanedText = cleanedText.replace(/```$/, "");
+    }
+    cleanedText = cleanedText.trim();
+
+    try {
+      const parsedMembers = JSON.parse(cleanedText);
+      if (!Array.isArray(parsedMembers)) {
+        throw new Error("Dữ liệu trích xuất từ AI không phải dạng mảng thành viên.");
+      }
+      return res.json({ success: true, count: parsedMembers.length, data: parsedMembers });
+    } catch (parseErr: any) {
+      console.error("JSON parsing error of Gemini output. Output was:", cleanedText);
+      return res.status(500).json({ 
+        error: "Lỗi phân tích cú pháp kết quả từ Trí tuệ Nhân tạo. Hãy thử tài liệu rõ ràng hơn hoặc sử dụng tệp nhập Excel.",
+        rawAiOutput: responseText 
+      });
+    }
+
+  } catch (error: any) {
+    console.error("Document parsing endpoint error:", error);
+    return res.status(500).json({ error: "Không thể phân tích tài liệu: " + error.message });
+  }
+});
 
 // 1. Members Endpoints
 app.get("/api/members", async (req, res) => {

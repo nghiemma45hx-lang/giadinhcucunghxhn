@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Table, Calendar, MapPin, Phone, User, Award, Search, ArrowUpDown, Shield, PlusCircle, Edit2, Trash2, X, Plus, Download, Upload, RefreshCw, FileSpreadsheet, FileJson, Check, Loader2 } from 'lucide-react';
+import { Table, Calendar, MapPin, Phone, User, Award, Search, ArrowUpDown, Shield, PlusCircle, Edit2, Trash2, X, Plus, Download, Upload, RefreshCw, FileSpreadsheet, FileJson, Check, Loader2, FileText } from 'lucide-react';
 // @ts-ignore
 import { getLunarDate } from 'vietnamese-lunar-calendar';
 import { FamilyMember } from '../types';
@@ -182,45 +182,90 @@ export default function MemberTableView({
     if (input) input.click();
   };
 
-  // Action: Read and parse selected CSV/JSON file
+  // Action: Read and parse selected CSV, JSON, Excel, DOCX, or PDF file
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setImportError(null);
     setImportSuccess(null);
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const text = event.target?.result as string;
-        if (file.name.endsWith('.json')) {
+    // If it's JSON, parse it locally
+    if (file.name.endsWith('.json')) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const text = event.target?.result as string;
           const parsed = JSON.parse(text);
           if (Array.isArray(parsed)) {
             setImportedMembers(parsed);
             setIsImportModalOpen(true);
+            setImportSuccess(`Đã nhận dạng thành công ${parsed.length} thành viên từ tệp JSON!`);
           } else if (parsed && typeof parsed === 'object') {
             setImportedMembers([parsed]);
             setIsImportModalOpen(true);
+            setImportSuccess(`Đã nhận dạng thành công 1 thành viên từ tệp JSON!`);
           } else {
             throw new Error('Định dạng tệp JSON không hợp lệ. Phải là một mảng danh sách thành viên.');
           }
-        } else if (file.name.endsWith('.csv')) {
-          const rows = parseCSV(text);
-          if (rows.length === 0) {
-            throw new Error('Tệp CSV trống hoặc không tìm thấy dòng dữ liệu hợp lệ.');
-          }
-          const parsedMembers = rows.map(r => mapCsvRowToMember(r) as FamilyMember);
-          setImportedMembers(parsedMembers);
+        } catch (err: any) {
+          setImportError(err.message || 'Lỗi đọc tệp JSON.');
+          alert(err.message || 'Lỗi đọc tệp JSON.');
+        }
+      };
+      reader.readAsText(file, 'UTF-8');
+      e.target.value = '';
+      return;
+    }
+
+    // For xlsx, xls, csv, docx, pdf, upload to our unified endpoint /api/members/parse-document
+    setIsSyncing(true);
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const arrayBuffer = event.target?.result as ArrayBuffer;
+        
+        // Convert arrayBuffer to Base64 safely
+        const bytes = new Uint8Array(arrayBuffer);
+        let binaryStr = '';
+        const len = bytes.byteLength;
+        for (let i = 0; i < len; i++) {
+          binaryStr += String.fromCharCode(bytes[i]);
+        }
+        const base64String = btoa(binaryStr);
+
+        const response = await fetch('/api/members/parse-document', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            base64: base64String,
+            fileName: file.name,
+            mimeType: file.type
+          })
+        });
+
+        const resData = await response.json();
+        setIsSyncing(false);
+
+        if (!response.ok) {
+          throw new Error(resData.error || 'Lỗi phân tích tài liệu.');
+        }
+
+        if (resData.success && resData.data) {
+          setImportedMembers(resData.data);
           setIsImportModalOpen(true);
+          setImportSuccess(`Đã nhận diện thành công ${resData.count} thành viên từ tệp ${file.name}!`);
         } else {
-          throw new Error('Chỉ hỗ trợ tệp định dạng .csv hoặc .json');
+          throw new Error('Không trích xuất được thành viên nào từ tài liệu.');
         }
       } catch (err: any) {
-        setImportError(err.message || 'Lỗi đọc tệp dữ liệu phả hệ.');
-        alert(err.message || 'Lỗi đọc tệp dữ liệu phả hệ.');
+        setIsSyncing(false);
+        setImportError(err.message || 'Lỗi đọc tệp.');
+        alert(err.message || 'Lỗi đọc tệp.');
       }
     };
-    reader.readAsText(file, 'UTF-8');
+    reader.readAsArrayBuffer(file);
     e.target.value = '';
   };
 
@@ -743,7 +788,7 @@ export default function MemberTableView({
             <input
               type="file"
               id="import-file-input"
-              accept=".csv,.json"
+              accept=".csv,.json,.xlsx,.xls,.docx,.pdf"
               className="hidden"
               onChange={handleFileSelect}
             />
@@ -754,7 +799,7 @@ export default function MemberTableView({
                 type="button"
                 onClick={() => setIsTemplateMenuOpen(!isTemplateMenuOpen)}
                 className="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold rounded-lg border border-amber-200 transition flex items-center gap-1.5 shrink-0 cursor-pointer"
-                title="Tải biểu mẫu nhập dữ liệu về máy tính"
+                title="Tải biểu mẫu nhập dữ liệu về máy tính (.xlsx, .docx, .pdf, .json)"
               >
                 <Download className="w-3.5 h-3.5 text-amber-700" />
                 <span>Tải Mẫu</span>
@@ -763,22 +808,65 @@ export default function MemberTableView({
               {isTemplateMenuOpen && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setIsTemplateMenuOpen(false)}></div>
-                  <div className="absolute right-0 mt-1.5 w-48 bg-white border border-[#eadecb] rounded-lg shadow-lg z-20 py-1 text-xs">
+                  <div className="absolute right-0 mt-1.5 w-60 bg-white border border-[#eadecb] rounded-lg shadow-lg z-20 py-1 text-xs">
                     <button
                       type="button"
-                      onClick={downloadCSVTemplate}
-                      className="w-full text-left px-4 py-2 hover:bg-[#fdfbf7] flex items-center gap-2 text-gray-700 font-medium cursor-pointer"
+                      onClick={() => {
+                        window.location.href = '/api/templates/download?format=excel';
+                        setIsTemplateMenuOpen(false);
+                      }}
+                      className="w-full text-left px-4 py-2 hover:bg-[#fdfbf7] flex items-center gap-3 text-gray-700 font-medium cursor-pointer border-b border-gray-50"
+                      title="Tải tệp mẫu Excel (.xlsx) chuẩn hóa các trường dữ liệu phả hệ"
                     >
-                      <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-                      Tải mẫu CSV (Excel)
+                      <FileSpreadsheet className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <div>
+                        <span className="block font-bold text-gray-800">Mẫu Excel (.xlsx)</span>
+                        <span className="block text-[10px] text-gray-400 font-normal">Bảng biểu chuẩn hóa</span>
+                      </div>
                     </button>
                     <button
                       type="button"
-                      onClick={downloadJSONTemplate}
-                      className="w-full text-left px-4 py-2 hover:bg-[#fdfbf7] flex items-center gap-2 text-gray-700 font-medium cursor-pointer"
+                      onClick={() => {
+                        window.location.href = '/api/templates/download?format=docx';
+                        setIsTemplateMenuOpen(false);
+                      }}
+                      className="w-full text-left px-4 py-2 hover:bg-[#fdfbf7] flex items-center gap-3 text-gray-700 font-medium cursor-pointer border-b border-gray-50"
+                      title="Tải mẫu văn bản Word (.docx) dành cho ghi ghép cốt truyện bằng AI"
                     >
-                      <FileJson className="w-4 h-4 text-blue-500" />
-                      Tải mẫu JSON
+                      <FileText className="w-4 h-4 text-blue-500 shrink-0" />
+                      <div>
+                        <span className="block font-bold text-gray-800">Mẫu Word (.doc/.docx)</span>
+                        <span className="block text-[10px] text-gray-400 font-normal">Lời mô tả lịch sử phả hệ AI</span>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        window.open('/api/templates/download?format=pdf', '_blank');
+                        setIsTemplateMenuOpen(false);
+                      }}
+                      className="w-full text-left px-4 py-2 hover:bg-[#fdfbf7] flex items-center gap-3 text-gray-700 font-medium cursor-pointer border-b border-gray-50"
+                      title="In hoặc tải bản mẫu PDF truyền thống để biên tập tay"
+                    >
+                      <FileText className="w-4 h-4 text-rose-500 shrink-0" />
+                      <div>
+                        <span className="block font-bold text-gray-800">Bản mẫu PDF (In/Lưu)</span>
+                        <span className="block text-[10px] text-gray-400 font-normal">Tờ khai thông tin phả hệ</span>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        downloadJSONTemplate();
+                        setIsTemplateMenuOpen(false);
+                      }}
+                      className="w-full text-left px-4 py-2 hover:bg-[#fdfbf7] flex items-center gap-3 text-gray-700 font-medium cursor-pointer"
+                    >
+                      <FileJson className="w-4 h-4 text-purple-500 shrink-0" />
+                      <div>
+                        <span className="block font-bold text-gray-800">Mẫu cấu trúc JSON</span>
+                        <span className="block text-[10px] text-gray-400 font-normal">Định dạng nén lập trình viên</span>
+                      </div>
                     </button>
                   </div>
                 </>
