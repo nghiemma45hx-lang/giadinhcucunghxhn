@@ -1,5 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Table, Calendar, MapPin, Phone, User, Award, Search, ArrowUpDown, Shield, PlusCircle, Edit2, Trash2, X, Plus } from 'lucide-react';
+// @ts-ignore
+import { getLunarDate } from 'vietnamese-lunar-calendar';
 import { FamilyMember } from '../types';
 
 interface MemberTableViewProps {
@@ -296,6 +298,27 @@ export default function MemberTableView({
     return `${cans[canIndex]} ${chis[chiIndex]}`;
   };
 
+  const convertSolarToLunarStr = (dateStr: string): string | null => {
+    if (!dateStr) return null;
+    const cleaned = dateStr.trim();
+    const match = cleaned.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (!match) return null;
+    const d = parseInt(match[1], 10);
+    const m = parseInt(match[2], 10);
+    const y = parseInt(match[3], 10);
+    try {
+      // @ts-ignore
+      const res = getLunarDate(d, m, y);
+      if (res && res.day && res.month && res.year) {
+        const canChiYear = getCanChi(String(res.year));
+        return `ngày ${res.day} tháng ${res.month}${res.leap ? ' (nhuận)' : ''} năm ${canChiYear}`;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return null;
+  };
+
   const getAgeAndLifespanText = () => {
     const bYear = parseYearStr(birthYear);
     if (!bYear || isNaN(bYear)) return null;
@@ -324,7 +347,7 @@ export default function MemberTableView({
       return {
         birthLunar,
         deathLunar: '',
-        ageText: `Sinh: ${birthYear} (${birthLunar}). Tuổi hiện tại: ${ageDiff} tuổi`
+        ageText: `Sinh: ${birthYear} (${birthLunar}). Tuổi: ${ageDiff} tuổi`
       };
     }
   };
@@ -692,19 +715,35 @@ export default function MemberTableView({
                 )}
 
                 {/* Dynamic Lunar & Age Info */}
-                {getAgeAndLifespanText() && (
-                  <div className="col-span-1 md:col-span-2 p-3 bg-amber-50/60 border border-amber-200 rounded-xl flex items-start gap-2.5 shadow-2xs">
-                    <span className="text-sm mt-0.5">📅</span>
-                    <div>
-                      <p className="font-bold text-amber-950 leading-snug">
-                        Tính toán Âm lịch & Tuổi thọ (Tự sinh):
-                      </p>
-                      <p className="font-semibold text-amber-900 mt-0.5">
-                        {getAgeAndLifespanText()?.ageText}
-                      </p>
+                {(() => {
+                  const info = getAgeAndLifespanText();
+                  if (!info) return null;
+                  const bLunarStr = convertSolarToLunarStr(birthYear);
+                  const dLunarStr = convertSolarToLunarStr(deathYear);
+                  return (
+                    <div className="col-span-1 md:col-span-2 p-3 bg-amber-50/60 border border-amber-200 rounded-xl flex items-start gap-2.5 shadow-2xs">
+                      <span className="text-sm mt-0.5">📅</span>
+                      <div>
+                        <p className="font-bold text-amber-950 leading-snug">
+                          Tính toán Âm lịch & Tuổi thọ (Tự sinh):
+                        </p>
+                        <p className="font-semibold text-amber-900 mt-0.5">
+                          {info.ageText}
+                        </p>
+                        {bLunarStr && (
+                          <p className="text-amber-800 font-semibold mt-1">
+                            Sinh (Âm lịch): {bLunarStr}
+                          </p>
+                        )}
+                        {dLunarStr && (
+                          <p className="text-rose-700 font-semibold mt-1">
+                            Mất (Âm lịch): {dLunarStr}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* Parent Link */}
                 <div className="space-y-3.5">
