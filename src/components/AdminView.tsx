@@ -128,6 +128,42 @@ export default function AdminView({
     setIsMemberModalOpen(true);
   };
 
+  // Switch form context to another member (Edit/Navigate)
+  const handleSwitchToMember = (targetMember: FamilyMember) => {
+    setEditingMember(targetMember);
+    setName(targetMember.name);
+    setGender(targetMember.gender);
+    setGeneration(targetMember.generation);
+    setRole(targetMember.role);
+    setBirthYear(targetMember.birthYear || '');
+    setDeathYear(targetMember.deathYear || '');
+    setIsDeceased(targetMember.isDeceased);
+    setParentId(targetMember.parentId || '');
+    setSpouseId(targetMember.spouseId || '');
+    setBranch(targetMember.branch);
+    setStory(targetMember.story || '');
+    setOccupation(targetMember.occupation || '');
+    setAddress(targetMember.address || '');
+    setPhone(targetMember.phone || '');
+  };
+
+  // Bầu đoàn nhà cụ/ông/bác/anh calculations
+  const fatherInfo = React.useMemo(() => {
+    return parentId ? members.find(m => m.id === parentId) : null;
+  }, [parentId, members]);
+
+  const fatherSiblings = React.useMemo(() => {
+    if (!fatherInfo) return [];
+    const gParentId = fatherInfo.parentId;
+    if (!gParentId) return [];
+    return members.filter(m => m.parentId === gParentId && m.id !== fatherInfo.id);
+  }, [fatherInfo, members]);
+
+  const familySiblings = React.useMemo(() => {
+    if (!parentId) return [];
+    return members.filter(m => m.parentId === parentId && m.id !== (editingMember?.id || ''));
+  }, [parentId, editingMember, members]);
+
   // Handle member submit
   const handleMemberSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -820,32 +856,174 @@ export default function AdminView({
 
                 {/* Parent Link */}
                 <div>
-                  <label className="block font-bold text-[#6b4724] mb-1">Liên kết phụ thân (Cha):</label>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="font-bold text-[#6b4724]">Liên kết phụ thân (Cha):</label>
+                    {parentId && (
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const target = members.find(m => m.id === parentId);
+                            if (target) handleSwitchToMember(target);
+                          }}
+                          className="text-[10px] text-amber-800 hover:underline font-bold cursor-pointer"
+                        >
+                          Sửa Cha
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setParentId('')}
+                          className="text-[10px] text-rose-600 hover:underline font-bold cursor-pointer"
+                        >
+                          Hủy liên kết
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   <select
                     value={parentId}
                     onChange={(e) => setParentId(e.target.value)}
                     className="w-full p-2 border border-[#d6b583] rounded bg-white"
                   >
                     <option value="">-- Không có hoặc là Cụ tổ --</option>
-                    {members.filter(m => m.gender === 'male').map(m => (
-                      <option key={m.id} value={m.id}>{m.name} (Đời {m.generation})</option>
-                    ))}
+                    {members
+                      .filter(m => m.gender === 'male' && m.id !== (editingMember?.id || ''))
+                      .map(m => (
+                        <option key={m.id} value={m.id}>{m.name} (Đời {m.generation})</option>
+                      ))}
                   </select>
                 </div>
 
                 {/* Spouse Link */}
                 <div>
-                  <label className="block font-bold text-[#6b4724] mb-1">Liên kết hôn phối (Vợ / Chồng):</label>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="font-bold text-[#6b4724]">Liên kết hôn phối (Vợ / Chồng):</label>
+                    {spouseId && (
+                      <div className="flex gap-2 border border-amber-300 rounded bg-amber-50 px-1.5 py-0.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const target = members.find(m => m.id === spouseId);
+                            if (target) handleSwitchToMember(target);
+                          }}
+                          className="text-[10px] text-amber-900 hover:underline font-bold cursor-pointer"
+                        >
+                          Sửa Vợ/Chồng
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSpouseId('')}
+                          className="text-[10px] text-rose-700 hover:underline font-bold cursor-pointer"
+                        >
+                          Hủy liên kết
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   <select
                     value={spouseId}
                     onChange={(e) => setSpouseId(e.target.value)}
                     className="w-full p-2 border border-[#d6b583] rounded bg-white"
                   >
                     <option value="">-- Chưa kết hôn / độc thân --</option>
-                    {members.map(m => (
-                      <option key={m.id} value={m.id}>{m.name} (Đời {m.generation})</option>
-                    ))}
+                    {members
+                      .filter(m => m.id !== (editingMember?.id || ''))
+                      .map(m => (
+                        <option key={m.id} value={m.id}>{m.name} (Đời {m.generation})</option>
+                      ))}
                   </select>
+                </div>
+
+                {/* Bầu đoàn dòng tộc card */}
+                <div className="col-span-1 md:col-span-2 p-3.5 bg-[#fdfbf7] rounded-xl border border-[#eadecb] space-y-3">
+                  <div className="flex justify-between items-center border-b border-[#eadecb] pb-2">
+                    <span className="font-bold text-[#6b4724] text-xs flex items-center gap-1.5">
+                      👥 Bầu đoàn nhà cụ/ông/bác/anh (Thân tộc liên quan)
+                    </span>
+                    {fatherInfo && (
+                      <span className="text-[10px] bg-[#6b4724] text-white font-bold px-2 py-0.5 rounded-full">
+                        Nhà đời {fatherInfo.generation}
+                      </span>
+                    )}
+                  </div>
+
+                  {fatherInfo ? (
+                    <div className="space-y-3 text-[11px] text-[#5c4021]">
+                      {/* Generation above (Father & Uncles) */}
+                      <div>
+                        <div className="font-bold text-[#8b7355] mb-1.5 flex items-center gap-1">
+                          🔸 Hàng Cụ/Ông/Bác/Chú (Thế hệ của phụ thân):
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {/* Selected Father */}
+                          <div className="px-2.5 py-1 bg-[#6b4724] text-[#fdfbf7] rounded-lg font-bold flex items-center gap-1.5 shadow-sm">
+                            <span>👨 {fatherInfo.name} (Phụ thân)</span>
+                            <button
+                              type="button"
+                              onClick={() => handleSwitchToMember(fatherInfo)}
+                              className="hover:scale-110 text-white/80 hover:text-white ml-1 text-xs cursor-pointer"
+                              title="Sửa thông tin phụ thân"
+                            >
+                              ✏️
+                            </button>
+                          </div>
+                          {/* Uncles */}
+                          {fatherSiblings.length > 0 ? (
+                            fatherSiblings.map(sib => (
+                              <div
+                                key={sib.id}
+                                onClick={() => handleSwitchToMember(sib)}
+                                className="px-2.5 py-1 bg-white hover:bg-[#eadecb]/40 border border-[#d6b583] text-[#6b4724] rounded-lg font-semibold cursor-pointer transition flex items-center gap-1.5 shadow-2xs"
+                                title="Bấm để chuyển qua chỉnh sửa"
+                              >
+                                <span>
+                                  {sib.gender === 'male' ? '👨' : '👩'} {sib.name} ({sib.role})
+                                </span>
+                              </div>
+                            ))
+                          ) : (
+                            <span className="text-gray-400 italic font-medium px-2 py-1">Chưa ghi nhận thông tin anh em ruột khác của cha</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* This generation (Siblings / Brothers / Sisters) */}
+                      <div>
+                        <div className="font-bold text-[#8b7355] mb-1.5 flex items-center gap-1">
+                          🔸 Hàng Anh/Chị/Em ruột (Các con khác của phụ thân):
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {/* Current being edited */}
+                          {editingMember && (
+                            <div className="px-2.5 py-1 bg-[#b8956b] text-[#fdfbf7] rounded-lg font-bold shadow-sm">
+                              ✨ {editingMember.name} (Đang sửa)
+                            </div>
+                          )}
+                          {/* Other siblings */}
+                          {familySiblings.length > 0 ? (
+                            familySiblings.map(sib => (
+                              <div
+                                key={sib.id}
+                                onClick={() => handleSwitchToMember(sib)}
+                                className="px-2.5 py-1 bg-white hover:bg-[#eadecb]/40 border border-[#d6b583] text-[#6b4724] rounded-lg font-semibold cursor-pointer transition flex items-center gap-1.5 shadow-2xs"
+                                title="Bấm để chuyển qua chỉnh sửa"
+                              >
+                                <span>
+                                  {sib.gender === 'male' ? '👦' : '👧'} {sib.name} ({sib.role})
+                                </span>
+                              </div>
+                            ))
+                          ) : (
+                            <span className="text-gray-400 italic font-medium px-2 py-1">Chưa ghi nhận anh em ruột khác</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 text-gray-400 italic font-medium">
+                      Hãy chọn Liên kết phụ thân (Cha) ở phía trên để tự động hiển thị bầu đoàn nhà cụ/ông/bác/anh...
+                    </div>
+                  )}
                 </div>
 
                 {/* Occupation */}
