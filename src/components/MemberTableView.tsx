@@ -278,8 +278,16 @@ export default function MemberTableView({
     setIsModalOpen(false);
   };
 
+  const parseYearStr = (str: string): number => {
+    if (!str) return NaN;
+    const cleaned = str.trim();
+    const match = cleaned.match(/\b\d{4}\b/);
+    if (match) return parseInt(match[0], 10);
+    return parseInt(cleaned, 10);
+  };
+
   const getCanChi = (yearStr: string): string => {
-    const year = parseInt(yearStr, 10);
+    const year = parseYearStr(yearStr);
     if (!year || isNaN(year)) return '';
     const cans = ['Canh', 'Tân', 'Nhâm', 'Quý', 'Giáp', 'Ất', 'Bính', 'Đinh', 'Mậu', 'Kỷ'];
     const chis = ['Thân', 'Dậu', 'Tuất', 'Hợi', 'Tý', 'Sửu', 'Dần', 'Mão', 'Thìn', 'Tỵ', 'Ngọ', 'Mùi'];
@@ -289,14 +297,14 @@ export default function MemberTableView({
   };
 
   const getAgeAndLifespanText = () => {
-    const bYear = parseInt(birthYear, 10);
+    const bYear = parseYearStr(birthYear);
     if (!bYear || isNaN(bYear)) return null;
 
     const birthLunar = getCanChi(birthYear);
     const currentYear = 2026;
 
     if (isDeceased) {
-      const dYear = parseInt(deathYear, 10);
+      const dYear = parseYearStr(deathYear);
       if (!dYear || isNaN(dYear)) {
         return {
           birthLunar,
@@ -306,20 +314,17 @@ export default function MemberTableView({
       }
       const deathLunar = getCanChi(deathYear);
       const ageDiff = dYear - bYear;
-      const ageLunar = ageDiff + 1;
-      const term = ageDiff >= 60 ? 'Hưởng thọ' : 'Hưởng dương';
       return {
         birthLunar,
         deathLunar,
-        ageText: `Sinh: ${birthYear} (${birthLunar}) — Mất: ${deathYear} (${deathLunar}). ${term}: ${ageDiff} tuổi (Tuổi mụ: ${ageLunar} tuổi)`
+        ageText: `Sinh: ${birthYear} (${birthLunar}) — Mất: ${deathYear} (${deathLunar}). Tuổi mất: ${ageDiff} tuổi`
       };
     } else {
       const ageDiff = currentYear - bYear;
-      const ageLunar = ageDiff + 1;
       return {
         birthLunar,
         deathLunar: '',
-        ageText: `Sinh: ${birthYear} (${birthLunar}). Tuổi hiện tại: ${ageDiff} tuổi (Tuổi mụ: ${ageLunar} tuổi)`
+        ageText: `Sinh: ${birthYear} (${birthLunar}). Tuổi hiện tại: ${ageDiff} tuổi`
       };
     }
   };
