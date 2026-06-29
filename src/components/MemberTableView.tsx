@@ -39,6 +39,7 @@ export default function MemberTableView({
   const [parentId, setParentId] = useState('');
   const [motherId, setMotherId] = useState('');
   const [spouseId, setSpouseId] = useState('');
+  const [spouseIds, setSpouseIds] = useState<string[]>([]);
   const [branch, setBranch] = useState('Chi Cụ Bà Hai');
   const [story, setStory] = useState('');
   const [occupation, setOccupation] = useState('');
@@ -48,8 +49,10 @@ export default function MemberTableView({
   const [originalParentId, setOriginalParentId] = useState('');
   const [originalMotherId, setOriginalMotherId] = useState('');
   const [originalSpouseId, setOriginalSpouseId] = useState('');
+  const [originalSpouseIds, setOriginalSpouseIds] = useState<string[]>([]);
   const [isMarried, setIsMarried] = useState(false);
   const [relationNotes, setRelationNotes] = useState('');
+  const [spouseSearch, setSpouseSearch] = useState('');
 
   // Filter members
   const filteredMembers = useMemo(() => {
@@ -119,6 +122,7 @@ export default function MemberTableView({
     setParentId('');
     setMotherId('');
     setSpouseId('');
+    setSpouseIds([]);
     setBranch('Chi Cụ Bà Hai');
     setStory('');
     setOccupation('');
@@ -127,8 +131,10 @@ export default function MemberTableView({
     setOriginalParentId('');
     setOriginalMotherId('');
     setOriginalSpouseId('');
+    setOriginalSpouseIds([]);
     setIsMarried(false);
     setRelationNotes('');
+    setSpouseSearch('');
     setIsModalOpen(true);
   };
 
@@ -153,6 +159,8 @@ export default function MemberTableView({
     setParentId(member.parentId || '');
     setMotherId(member.motherId || '');
     setSpouseId(member.spouseId || '');
+    const initialSpouseIds = member.spouseIds || (member.spouseId ? [member.spouseId] : []);
+    setSpouseIds(initialSpouseIds);
     setBranch(member.branch);
     
     // Parse story for relationNotes
@@ -168,7 +176,9 @@ export default function MemberTableView({
     setOriginalParentId(member.parentId || '');
     setOriginalMotherId(member.motherId || '');
     setOriginalSpouseId(member.spouseId || '');
-    setIsMarried(member.isMarried || !!member.spouseId || false);
+    setOriginalSpouseIds(initialSpouseIds);
+    setIsMarried(member.isMarried || !!member.spouseId || initialSpouseIds.length > 0 || false);
+    setSpouseSearch('');
     setIsModalOpen(true);
   };
 
@@ -185,6 +195,8 @@ export default function MemberTableView({
     setParentId(targetMember.parentId || '');
     setMotherId(targetMember.motherId || '');
     setSpouseId(targetMember.spouseId || '');
+    const initialSpouseIds = targetMember.spouseIds || (targetMember.spouseId ? [targetMember.spouseId] : []);
+    setSpouseIds(initialSpouseIds);
     setBranch(targetMember.branch);
     
     // Parse story for relationNotes
@@ -200,7 +212,9 @@ export default function MemberTableView({
     setOriginalParentId(targetMember.parentId || '');
     setOriginalMotherId(targetMember.motherId || '');
     setOriginalSpouseId(targetMember.spouseId || '');
-    setIsMarried(targetMember.isMarried || !!targetMember.spouseId || false);
+    setOriginalSpouseIds(initialSpouseIds);
+    setIsMarried(targetMember.isMarried || !!targetMember.spouseId || initialSpouseIds.length > 0 || false);
+    setSpouseSearch('');
   };
 
   // Bầu đoàn nhà cụ/ông/bác/anh calculations
@@ -239,7 +253,8 @@ export default function MemberTableView({
       isDeceased,
       parentId: parentId || undefined,
       motherId: motherId || undefined,
-      spouseId: spouseId || undefined,
+      spouseId: isMarried ? ((spouseIds && spouseIds.length > 0) ? spouseIds[0] : (spouseId || undefined)) : undefined,
+      spouseIds: isMarried && spouseIds && spouseIds.length > 0 ? spouseIds : undefined,
       isMarried: isMarried || undefined,
       branch,
       story: relationNotes.trim() ? `${story.trim()} ||| ${relationNotes.trim()}` : story.trim() || undefined,
@@ -723,7 +738,7 @@ export default function MemberTableView({
                 </div>
 
                 {/* Spouse Link */}
-                <div className="flex flex-col justify-between h-full">
+                <div className="flex flex-col justify-between h-full space-y-3">
                   <div>
                     <div className="flex justify-between items-center mb-1">
                       <label className="font-bold text-[#6b4724] flex items-center gap-1.5 cursor-pointer select-none">
@@ -735,6 +750,7 @@ export default function MemberTableView({
                             setIsMarried(checked);
                             if (!checked) {
                               setSpouseId('');
+                              setSpouseIds([]);
                             }
                           }}
                           className="rounded text-rose-600 border-[#d6b583] focus:ring-rose-400 w-4.5 h-4.5 cursor-pointer accent-rose-600"
@@ -742,61 +758,151 @@ export default function MemberTableView({
                         <span>Liên kết hôn phối (Vợ / Chồng):</span>
                       </label>
                       <div className="flex gap-1.5 items-center">
-                        {spouseId && (
-                          <div className="flex gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const target = members.find(m => m.id === spouseId);
-                                if (target) handleSwitchToMember(target);
-                              }}
-                              className="text-[10px] bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded hover:bg-amber-200 font-bold cursor-pointer"
-                            >
-                              Sửa Vợ/Chồng
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setSpouseId('')}
-                              className="text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded hover:bg-rose-200 font-bold cursor-pointer"
-                            >
-                              Xóa liên kết
-                            </button>
-                          </div>
+                        {spouseIds.length > 0 && (
+                          <span className="text-[10px] bg-rose-100 text-rose-800 font-bold px-2 py-0.5 rounded-full">
+                            Đã chọn: {spouseIds.length}
+                          </span>
                         )}
-                        {spouseId !== originalSpouseId && (
+                        {spouseIds.toString() !== originalSpouseIds.toString() && (
                           <button
                             type="button"
-                            onClick={() => setSpouseId(originalSpouseId)}
+                            onClick={() => {
+                              setSpouseIds(originalSpouseIds);
+                              setSpouseId(originalSpouseIds.length > 0 ? originalSpouseIds[0] : '');
+                            }}
                             className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded hover:bg-blue-200 font-bold cursor-pointer"
                             title="Khôi phục liên kết hôn phối gốc"
                           >
-                            Undo (Hoàn tác)
+                            Undo
                           </button>
                         )}
                       </div>
                     </div>
-                    <select
-                      value={spouseId}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setSpouseId(val);
-                        if (val) {
-                          setIsMarried(true);
-                        }
-                      }}
-                      className="w-full p-2 border border-[#d6b583] rounded bg-white focus:outline-none focus:ring-2 focus:ring-[#b8956b] cursor-pointer"
-                    >
-                      <option value="">-- Chưa kết hôn / độc thân --</option>
-                      {members
-                        .filter(m => m.id !== (editingMember?.id || ''))
-                        .map(m => (
-                          <option key={m.id} value={m.id}>{m.name} (Đời {m.generation})</option>
-                        ))}
-                    </select>
+
+                    {isMarried ? (
+                      <div className="space-y-2 border border-rose-200 rounded-lg bg-rose-50/20 p-2">
+                        {/* Currently selected spouses list with buttons */}
+                        {spouseIds.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pb-1.5 border-b border-rose-100">
+                            {spouseIds.map(sid => {
+                              const spouse = members.find(m => m.id === sid);
+                              if (!spouse) return null;
+                              return (
+                                <div key={sid} className="flex items-center gap-1 bg-white border border-rose-200 rounded-full pl-2 pr-1 py-0.5 text-[10px] font-semibold text-rose-950">
+                                  <span>{spouse.name} ({spouse.gender === 'female' ? 'Bà' : 'Ông'} - Đời {spouse.generation})</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      handleSwitchToMember(spouse);
+                                    }}
+                                    className="text-amber-800 hover:underline font-bold text-[9px] px-1"
+                                    title="Sửa thành viên này"
+                                  >
+                                    Sửa
+                                  </button>
+                                  <span className="text-rose-200 text-[9px]">|</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const updated = spouseIds.filter(x => x !== sid);
+                                      setSpouseIds(updated);
+                                      setSpouseId(updated.length > 0 ? updated[0] : '');
+                                    }}
+                                    className="text-rose-600 hover:text-rose-800 font-bold text-[9px] px-1"
+                                    title="Xóa liên kết"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Search input for spouses */}
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={spouseSearch}
+                            onChange={(e) => setSpouseSearch(e.target.value)}
+                            placeholder="🔍 Tìm nhanh Vợ/Chồng theo tên..."
+                            className="w-full p-1.5 text-xs border border-[#d6b583] rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-rose-400 placeholder-gray-400"
+                          />
+                        </div>
+
+                        {/* Checklist of potential spouses */}
+                        <div className="max-h-36 overflow-y-auto border border-rose-100 rounded bg-white p-1.5 space-y-1">
+                          {(() => {
+                            // Filter and sort spouses
+                            const currentMemberId = editingMember?.id || '';
+                            const searchLower = spouseSearch.trim().toLowerCase();
+                            
+                            const filtered = members
+                              .filter(m => m.id !== currentMemberId)
+                              .filter(m => {
+                                if (!searchLower) return true;
+                                return m.name.toLowerCase().includes(searchLower) || m.generation.toString() === searchLower;
+                              });
+
+                            // Sort: selected spouses first, then opposite gender first, then by generation/name
+                            const sorted = [...filtered].sort((a, b) => {
+                              const aSelected = spouseIds.includes(a.id) ? 1 : 0;
+                              const bSelected = spouseIds.includes(b.id) ? 1 : 0;
+                              if (aSelected !== bSelected) return bSelected - aSelected;
+
+                              const isOppositeA = editingMember && a.gender !== editingMember.gender ? 1 : 0;
+                              const isOppositeB = editingMember && b.gender !== editingMember.gender ? 1 : 0;
+                              if (isOppositeA !== isOppositeB) return isOppositeB - isOppositeA;
+
+                              return a.generation - b.generation || a.name.localeCompare(b.name);
+                            });
+
+                            if (sorted.length === 0) {
+                              return <div className="text-[10px] text-gray-400 text-center py-2">Không tìm thấy thành viên nào</div>;
+                            }
+
+                            return sorted.map(m => {
+                              const isChecked = spouseIds.includes(m.id);
+                              return (
+                                <label
+                                  key={m.id}
+                                  className={`flex items-center gap-2 p-1 rounded hover:bg-rose-50/50 cursor-pointer text-xs select-none ${isChecked ? 'bg-rose-50/30' : ''}`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={() => {
+                                      const updated = isChecked
+                                        ? spouseIds.filter(x => x !== m.id)
+                                        : [...spouseIds, m.id];
+                                      setSpouseIds(updated);
+                                      setSpouseId(updated.length > 0 ? updated[0] : '');
+                                    }}
+                                    className="rounded text-rose-600 border-gray-300 focus:ring-rose-400 w-3.5 h-3.5 cursor-pointer accent-rose-600"
+                                  />
+                                  <span className="flex items-center justify-between w-full">
+                                    <span className="font-medium text-gray-800">
+                                      {m.name} {m.gender === 'female' ? '👩 (Nữ)' : '👨 (Nam)'}
+                                    </span>
+                                    <span className="text-[9px] text-gray-400">
+                                      Đời {m.generation}
+                                    </span>
+                                  </span>
+                                </label>
+                              );
+                            });
+                          })()}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-3 text-center border border-dashed border-[#d6b583] rounded-lg bg-gray-50 text-[11px] text-gray-400">
+                        Chưa chọn kết hôn. Tích chọn ô vuông phía trên để bật tính năng liên kết nhiều hôn phối.
+                      </div>
+                    )}
                   </div>
                   {/* Visual marriage decoration helper */}
                   <div className="hidden md:block text-[11px] text-rose-800 italic mt-auto bg-rose-50/50 border border-rose-100 p-2 rounded-lg">
-                    {isMarried ? "❤️ Đã chọn trạng thái Có kết hôn. Vui lòng liên kết Vợ/Chồng hoặc ghi thông tin Dâu ở phần Ghi chú." : "🕊️ Trạng thái Độc thân hoặc Chưa liên kết hôn phối."}
+                    {isMarried ? "❤️ Đã chọn trạng thái Có kết hôn. Hãy tích chọn danh sách Vợ/Chồng hoặc ghi thông tin Dâu ở phần Ghi chú." : "🕊️ Trạng thái Độc thân hoặc Chưa liên kết hôn phối."}
                   </div>
                 </div>
 
