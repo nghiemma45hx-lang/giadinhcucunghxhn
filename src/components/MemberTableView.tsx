@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Table, Calendar, MapPin, Phone, User, Award, Search, ArrowUpDown, Shield, PlusCircle, Edit2, Trash2, X, Plus, Download, Upload, RefreshCw, FileSpreadsheet, FileJson, Check, Loader2, FileText } from 'lucide-react';
 // @ts-ignore
 import { getLunarDate } from 'vietnamese-lunar-calendar';
+import * as XLSX from 'xlsx';
 import { FamilyMember } from '../types';
 
 interface MemberTableViewProps {
@@ -414,6 +415,516 @@ export default function MemberTableView({
     };
     reader.readAsDataURL(file);
     e.target.value = '';
+  };
+
+  // Action: Download Excel template client-side using SheetJS (XLSX)
+  const downloadExcelTemplateClientSide = () => {
+    try {
+      const headers = [
+        "Mã số (id)", "Họ và tên (name)", "Giới tính (gender: male/female)", 
+        "Đời thứ (generation)", "Vai trò (role)", "Năm sinh (birthYear)", 
+        "Năm mất (deathYear)", "Đã mất (isDeceased: true/false)", 
+        "Mã cha (parentId)", "Mã mẹ (motherId)", "Mã vợ/chồng (spouseId)", 
+        "Đã kết hôn (isMarried: true/false)", "Chi nhánh (branch)", 
+        "Tiểu sử (story)", "Nghề nghiệp (occupation)", "Địa chỉ (address)", "Số điện thoại (phone)"
+      ];
+
+      const rows = [
+        [
+          "nghiem-dieu", "Nghiêm Điều (Chu)", "male", 15, "CỤ CỐ ÔNG", 
+          "1875", "1945", true, "", "", "cu-ba-lun", true, "Nhánh chính", 
+          "Cụ cố khởi tổ sinh cơ lập nghiệp tại Hòa Xá...", "Nông nghiệp", "Hòa Xá, Ứng Hòa, Hà Nội", ""
+        ],
+        [
+          "cu-ba-lun", "Đỗ Thị Lùn", "female", 15, "CỤ CỐ BÀ", 
+          "1880", "1952", true, "", "", "nghiem-dieu", true, "Nhánh chính", 
+          "Cụ cố bà hiền từ đảm đang gánh vác việc gia đình...", "Nội trợ", "Hòa Xá, Ứng Hòa, Hà Nội", ""
+        ],
+        [
+          "nghiem-cung", "Nghiêm Cung", "male", 16, "CỤ ÔNG TRỤ CỘT", 
+          "1902", "1978", true, "nghiem-dieu", "cu-ba-lun", "", false, "Nhánh chính", 
+          "Y sĩ đông y nổi tiếng trong vùng Hòa Xá, bốc thuốc cứu người...", "Đông y", "Hòa Xá, Ứng Hòa, Hà Nội", "0901234567"
+        ]
+      ];
+
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+
+      // Set nice column widths for Excel
+      const wscols = [
+        { wch: 15 }, // id
+        { wch: 25 }, // name
+        { wch: 12 }, // gender
+        { wch: 10 }, // generation
+        { wch: 15 }, // role
+        { wch: 12 }, // birthYear
+        { wch: 12 }, // deathYear
+        { wch: 10 }, // isDeceased
+        { wch: 15 }, // parentId
+        { wch: 15 }, // motherId
+        { wch: 15 }, // spouseId
+        { wch: 12 }, // isMarried
+        { wch: 15 }, // branch
+        { wch: 40 }, // story
+        { wch: 15 }, // occupation
+        { wch: 30 }, // address
+        { wch: 15 }  // phone
+      ];
+      ws["!cols"] = wscols;
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "GiaPhaTemplate");
+
+      // Write as array buffer first and download
+      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', 'bieu_mau_nhap_gia_pha_excel.xlsx');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setIsTemplateMenuOpen(false);
+    } catch (error: any) {
+      console.error("Excel template generation error client side:", error);
+      alert("Không thể tạo biểu mẫu Excel: " + error.message);
+    }
+  };
+
+  // Action: Download Word template (.doc) client-side
+  const downloadWordTemplateClientSide = () => {
+    try {
+      const htmlDoc = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+        <head>
+          <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+          <style>
+            @page {
+              size: 8.5in 11.0in;
+              margin: 1.0in 1.0in 1.0in 1.0in;
+              mso-header-margin: .5in;
+              mso-footer-margin: .5in;
+              mso-paper-source: 0;
+            }
+            body { 
+              font-family: "Times New Roman", Times, serif; 
+              line-height: 1.6; 
+              color: #333333; 
+            }
+            h1 { 
+              text-align: center; 
+              color: #5d4037; 
+              font-size: 20pt; 
+              margin-bottom: 5pt; 
+              font-weight: bold; 
+              font-family: "Times New Roman", Times, serif; 
+            }
+            .subtitle { 
+              text-align: center; 
+              font-style: italic; 
+              color: #555555; 
+              font-size: 11pt; 
+              margin-bottom: 25pt; 
+              font-family: "Times New Roman", Times, serif; 
+            }
+            h2 { 
+              color: #8b7355; 
+              font-size: 14pt; 
+              border-bottom: 2px solid #b8956b; 
+              padding-bottom: 3px; 
+              margin-top: 25pt; 
+              font-weight: bold; 
+              font-family: "Times New Roman", Times, serif; 
+            }
+            table { 
+              width: 100%; 
+              border-collapse: collapse; 
+              margin-top: 10pt; 
+              margin-bottom: 15pt; 
+            }
+            th, td { 
+              border: 1px solid #d6b583; 
+              padding: 10px; 
+              text-align: left; 
+              font-size: 10pt; 
+              font-family: "Times New Roman", Times, serif; 
+            }
+            th { 
+              background-color: #fdfbf7; 
+              font-weight: bold; 
+              color: #5d4037; 
+            }
+            .note-box { 
+              background-color: #fffde7; 
+              border-left: 4px solid #fbc02d; 
+              padding: 10px; 
+              margin: 15pt 0; 
+              font-size: 9.5pt; 
+              color: #5d4037; 
+              font-family: "Times New Roman", Times, serif; 
+            }
+            .sample-narrative { 
+              background-color: #fafafa; 
+              border: 1px dashed #cccccc; 
+              padding: 12px; 
+              font-size: 10pt; 
+              line-height: 1.5; 
+              color: #444444; 
+              font-family: "Times New Roman", Times, serif; 
+            }
+          </style>
+        </head>
+        <body>
+          <h1>MẪU SOẠN THẢO GIA PHẢ - GIA TỘC NGHIÊM CUNG</h1>
+          <div class="subtitle">Dành cho việc số hóa sơ đồ phả hệ tự động bằng Trí tuệ Nhân tạo (AI)</div>
+          
+          <div class="note-box">
+            <strong>⚠️ HƯỚNG DẪN QUAN TRỌNG:</strong><br/>
+            Hệ thống AI thông minh của chúng tôi có khả năng đọc hiểu trực tiếp tệp Word văn bản này. Quý ban biên soạn dòng họ có thể chọn một trong hai cách soạn thảo bên dưới:
+            <br/>- <strong>Cách 1:</strong> Điền thông tin thành viên chi tiết vào Bảng cấu trúc mục II.
+            <br/>- <strong>Cách 2:</strong> Viết lời kể chuyện, mô tả chi tiết các cụ và mối quan hệ gia tộc ở mục III. AI sẽ tự đọc hiểu và liên kết thành sơ đồ phả hệ!
+          </div>
+
+          <h2>I. THÔNG TIN CHUNG</h2>
+          <p><strong>Dòng họ:</strong> Nghiêm Cung (Hòa Xá, Ứng Hòa, Hà Nội)</p>
+          <p><strong>Người đóng góp/Biên soạn:</strong> ............................................................</p>
+          <p><strong>Ngày lập bản mẫu:</strong> Ngày ...... tháng ...... năm 2026</p>
+
+          <h2>II. BẢNG THÔNG TIN THÀNH VIÊN GIA TỘC (MẪU CẤU TRÚC)</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Mã số (ID)*</th>
+                <th>Họ và tên*</th>
+                <th>Giới tính (Nam/Nữ)*</th>
+                <th>Đời thứ*</th>
+                <th>Vai trò/Danh xưng</th>
+                <th>Năm sinh</th>
+                <th>Năm mất</th>
+                <th>Mã cha (hoặc mẹ)</th>
+                <th>Quê quán/Địa chỉ</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>nghiem-dieu</td>
+                <td>Nghiêm Điều (Chu)</td>
+                <td>Nam</td>
+                <td>15</td>
+                <td>CỤ CỐ ÔNG</td>
+                <td>1875</td>
+                <td>1945</td>
+                <td>(Khởi tổ)</td>
+                <td>Hòa Xá, Ứng Hòa, Hà Nội</td>
+              </tr>
+              <tr>
+                <td>cu-ba-lun</td>
+                <td>Đỗ Thị Lùn</td>
+                <td>Nữ</td>
+                <td>15</td>
+                <td>CỤ CỐ BÀ</td>
+                <td>1880</td>
+                <td>1952</td>
+                <td></td>
+                <td>Hòa Xá, Ứng Hòa, Hà Nội</td>
+              </tr>
+              <tr>
+                <td>nghiem-cung</td>
+                <td>Nghiêm Cung</td>
+                <td>Nam</td>
+                <td>16</td>
+                <td>CỤ ÔNG TRỤ CỘT</td>
+                <td>1902</td>
+                <td>1978</td>
+                <td>nghiem-dieu</td>
+                <td>Hòa Xá, Ứng Hòa, Hà Nội</td>
+              </tr>
+              <tr>
+                <td>[Điền mã tiếp theo]</td>
+                <td>[Họ tên thành viên]</td>
+                <td>[Nam/Nữ]</td>
+                <td>[Đời thứ]</td>
+                <td>[Danh xưng dòng họ]</td>
+                <td>[Năm sinh]</td>
+                <td>[Năm mất]</td>
+                <td>[Mã người cha]</td>
+                <td>[Quê quán]</td>
+              </tr>
+            </tbody>
+          </table>
+          <p style="font-size: 9pt; color: #777777;">* Ghi chú: Mã số (ID) viết liền không dấu, ví dụ: 'nghiem-cung-con-ca', 'nghiem-ha', dùng để liên kết các cụ với nhau thông qua trường Mã cha.</p>
+
+          <h2>III. TIỂU SỬ CHI TIẾT / LỜI KỂ PHẢ HỆ DẠNG VĂN BẢN (MẪU)</h2>
+          <div class="sample-narrative">
+            Cụ ông Nghiêm Điều (Chu) kết hôn với cụ bà Đỗ Thị Lùn. Hai cụ sinh cơ lập nghiệp tại vùng quê Hòa Xá, nổi tiếng nhân đức đảm đang.
+            Cụ ông sinh năm 1875, qua đời năm 1945. Cụ bà sinh năm 1880, qua đời năm 1952. 
+            Hai cụ hạ sinh được cụ Nghiêm Cung (sinh năm 1902, mất năm 1978), tức cụ ông đời thứ 16 kế nghiệp gia phong dòng họ Nghiêm...
+            [Quý vị vui lòng viết tiếp lịch sử gia đình, lời giới thiệu dòng họ ở đây để AI trích xuất]
+          </div>
+        </body>
+        </html>
+      `;
+
+      const blob = new Blob([htmlDoc], { type: 'application/msword;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', 'bieu_mau_nhap_gia_pha_word.doc');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setIsTemplateMenuOpen(false);
+    } catch (error: any) {
+      console.error("Docx template generation error client side:", error);
+      alert("Không thể tạo biểu mẫu Word: " + error.message);
+    }
+  };
+
+  // Action: Open PDF template printable view client-side
+  const openPdfTemplateClientSide = () => {
+    try {
+      const pdfHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Biểu Mẫu Soạn Thảo Gia Phả Họ Nghiêm</title>
+          <style>
+            @media print {
+              body { margin: 0; padding: 0; background: white; font-size: 11pt; }
+              .no-print { display: none; }
+              .page-break { page-break-before: always; }
+            }
+            body {
+              font-family: 'Times New Roman', Times, serif;
+              line-height: 1.6;
+              color: #2b1b0c;
+              background-color: #faf7f2;
+              margin: 0;
+              padding: 40px;
+            }
+            .container {
+              max-width: 800px;
+              margin: 0 auto;
+              background: white;
+              padding: 50px 60px;
+              border: 1px solid #e2d3be;
+              box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+              position: relative;
+            }
+            .container::before {
+              content: "";
+              position: absolute;
+              top: 15px; left: 15px; right: 15px; bottom: 15px;
+              border: 1px solid #b8956b;
+              pointer-events: none;
+              opacity: 0.5;
+              box-sizing: border-box;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 30px;
+              border-bottom: 2px double #b8956b;
+              padding-bottom: 20px;
+            }
+            .header h1 {
+              font-size: 22pt;
+              margin: 0 0 10px 0;
+              color: #5d4037;
+              font-weight: bold;
+              text-transform: uppercase;
+              letter-spacing: 1px;
+            }
+            .header p {
+              margin: 5px 0;
+              font-style: italic;
+              color: #6d4c41;
+              font-size: 11pt;
+            }
+            h2 {
+              color: #5d4037;
+              font-size: 14pt;
+              border-bottom: 1px solid #d6b583;
+              padding-bottom: 5px;
+              margin-top: 25px;
+              text-transform: uppercase;
+              font-weight: bold;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin: 15px 0;
+            }
+            th, td {
+              border: 1px solid #d6b583;
+              padding: 8px 10px;
+              text-align: left;
+              font-size: 10pt;
+            }
+            th {
+              background-color: #fbf8f3;
+              color: #5d4037;
+              font-weight: bold;
+            }
+            .guidelines {
+              background-color: #fffde7;
+              border-left: 4px solid #fbc02d;
+              padding: 12px 15px;
+              margin: 20px 0;
+              font-size: 10pt;
+              border-radius: 4px;
+            }
+            .footer {
+              margin-top: 50px;
+              text-align: center;
+              font-size: 9.5pt;
+              color: #777777;
+              border-top: 1px dashed #d6b583;
+              padding-top: 15px;
+            }
+            .no-print-bar {
+              max-width: 800px;
+              margin: 0 auto 20px auto;
+              background: #5d4037;
+              color: white;
+              padding: 12px 20px;
+              border-radius: 8px;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              font-family: system-ui, sans-serif;
+              font-size: 13px;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            }
+            .print-btn {
+              background: #b8956b;
+              color: white;
+              border: none;
+              padding: 8px 16px;
+              border-radius: 4px;
+              font-weight: bold;
+              cursor: pointer;
+              transition: background 0.2s;
+            }
+            .print-btn:hover {
+              background: #a37f55;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="no-print-bar no-print">
+            <span><strong>🖨️ TRÌNH IN BIỂU MẪU PDF GIA PHẢ:</strong> Bản mẫu hiển thị chuẩn kích thước vector để in hoặc xuất PDF.</span>
+            <button class="print-btn" onclick="window.print()">In / Xuất PDF</button>
+          </div>
+
+          <div class="container">
+            <div class="header">
+              <h1>BIỂU MẪU BIÊN SOẠN GIA PHẢ</h1>
+              <p>Hội Đồng Gia Tộc Nghiêm Cung — Hòa Xá, Ứng Hòa, Hà Nội</p>
+              <p>Mẫu chuẩn số hóa sơ đồ cây phả hệ trực tuyến</p>
+            </div>
+
+            <div class="guidelines">
+              <strong>📖 HƯỚNG DẪN BIÊN CHÉP GIA PHẢ:</strong><br/>
+              Kính gửi các bậc cao niên và ban khánh tiết dòng họ, để việc dựng cây phả hệ số hóa được chính xác 100%, xin vui lòng điền các cụ tiền nhân vào Bảng Danh sách dưới đây hoặc cung cấp bản viết tay, tư liệu bằng văn bản lịch sử.
+              Hệ thống AI sẽ tự động đọc hiểu các mối liên kết (Cha - Con, Vợ - Chồng) từ tài liệu này!
+            </div>
+
+            <h2>I. THÔNG TIN NGƯỜI ĐÓNG GÓP TƯ LIỆU</h2>
+            <p>Họ tên: ........................................................................ Điện thoại: .............................................</p>
+            <p>Thuộc chi ngành: ........................................................... Địa chỉ hiện tại: .......................................</p>
+
+            <h2>II. SƠ ĐỒ ĐẠI DIỆN BA ĐỜI KHỞI TỔ (MẪU THAM KHẢO)</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 15%">Mã số (ID)</th>
+                  <th style="width: 25%">Họ và Tên các cụ</th>
+                  <th style="width: 10%">Đời thứ</th>
+                  <th style="width: 15%">Danh xưng</th>
+                  <th style="width: 20%">Mối quan hệ</th>
+                  <th style="width: 15%">Năm sinh/mất</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>nghiem-dieu</strong></td>
+                  <td>Nghiêm Điều (Chu)</td>
+                  <td>Đời 15</td>
+                  <td>CỤ CỐ ÔNG</td>
+                  <td>Khởi tổ dòng họ</td>
+                  <td>1875 - 1945</td>
+                </tr>
+                <tr>
+                  <td><strong>cu-ba-lun</strong></td>
+                  <td>Đỗ Thị Lùn</td>
+                  <td>Đời 15</td>
+                  <td>CỤ CỐ BÀ</td>
+                  <td>Vợ cụ Nghiêm Điều</td>
+                  <td>1880 - 1952</td>
+                </tr>
+                <tr>
+                  <td><strong>nghiem-cung</strong></td>
+                  <td>Nghiêm Cung</td>
+                  <td>Đời 16</td>
+                  <td>CỤ ÔNG TRỤ CỘT</td>
+                  <td>Con cụ Nghiêm Điều</td>
+                  <td>1902 - 1978</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <h2>III. DANH SÁCH THÀNH VIÊN CẦN THÊM MỚI</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th style="height: 25px;">Họ và Tên</th>
+                  <th>Giới tính</th>
+                  <th>Đời</th>
+                  <th>Tên Cha / Mẹ</th>
+                  <th>Tên Vợ / Chồng</th>
+                  <th>Năm sinh/mất</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td style="height: 30px;"></td><td></td><td></td><td></td><td></td><td></td></tr>
+                <tr><td style="height: 30px;"></td><td></td><td></td><td></td><td></td><td></td></tr>
+                <tr><td style="height: 30px;"></td><td></td><td></td><td></td><td></td><td></td></tr>
+                <tr><td style="height: 30px;"></td><td></td><td></td><td></td><td></td><td></td></tr>
+                <tr><td style="height: 30px;"></td><td></td><td></td><td></td><td></td><td></td></tr>
+              </tbody>
+            </table>
+
+            <h2>IV. LỊCH SỬ DÒNG HỌ / TIỂU SỬ CHI TIẾT (VIẾT TAY)</h2>
+            <p style="border-bottom: 1px dotted #ccc; height: 35px;"></p>
+            <p style="border-bottom: 1px dotted #ccc; height: 35px;"></p>
+            <p style="border-bottom: 1px dotted #ccc; height: 35px;"></p>
+            <p style="border-bottom: 1px dotted #ccc; height: 35px;"></p>
+
+            <div class="footer">
+              <p>Mẫu hồ sơ phả hệ Nghiêm Cung Gia Tộc — Uống nước nhớ nguồn, ngàn năm thịnh hưng</p>
+            </div>
+          </div>
+          <script>
+            window.onload = function() {
+              setTimeout(function() { window.print(); }, 500);
+            };
+          </script>
+        </body>
+        </html>
+      `;
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(pdfHtml);
+        printWindow.document.close();
+      } else {
+        alert("Không thể mở trình in PDF. Vui lòng cho phép mở cửa sổ bật lên (popup) trên trình duyệt của bạn.");
+      }
+      setIsTemplateMenuOpen(false);
+    } catch (error: any) {
+      console.error("PDF generation error client side:", error);
+      alert("Không thể tạo biểu mẫu PDF: " + error.message);
+    }
   };
 
   // Action: Download CSV template with Vietnamese columns and UTF-8 BOM
@@ -958,10 +1469,7 @@ export default function MemberTableView({
                   <div className="absolute right-0 mt-1.5 w-60 bg-white border border-[#eadecb] rounded-lg shadow-lg z-20 py-1 text-xs">
                     <button
                       type="button"
-                      onClick={() => {
-                        window.location.href = '/api/templates/download?format=excel';
-                        setIsTemplateMenuOpen(false);
-                      }}
+                      onClick={downloadExcelTemplateClientSide}
                       className="w-full text-left px-4 py-2 hover:bg-[#fdfbf7] flex items-center gap-3 text-gray-700 font-medium cursor-pointer border-b border-gray-50"
                       title="Tải tệp mẫu Excel (.xlsx) chuẩn hóa các trường dữ liệu phả hệ"
                     >
@@ -973,10 +1481,7 @@ export default function MemberTableView({
                     </button>
                     <button
                       type="button"
-                      onClick={() => {
-                        window.location.href = '/api/templates/download?format=docx';
-                        setIsTemplateMenuOpen(false);
-                      }}
+                      onClick={downloadWordTemplateClientSide}
                       className="w-full text-left px-4 py-2 hover:bg-[#fdfbf7] flex items-center gap-3 text-gray-700 font-medium cursor-pointer border-b border-gray-50"
                       title="Tải mẫu văn bản Word (.docx) dành cho ghi ghép cốt truyện bằng AI"
                     >
@@ -988,10 +1493,7 @@ export default function MemberTableView({
                     </button>
                     <button
                       type="button"
-                      onClick={() => {
-                        window.open('/api/templates/download?format=pdf', '_blank');
-                        setIsTemplateMenuOpen(false);
-                      }}
+                      onClick={openPdfTemplateClientSide}
                       className="w-full text-left px-4 py-2 hover:bg-[#fdfbf7] flex items-center gap-3 text-gray-700 font-medium cursor-pointer border-b border-gray-50"
                       title="In hoặc tải bản mẫu PDF truyền thống để biên tập tay"
                     >
