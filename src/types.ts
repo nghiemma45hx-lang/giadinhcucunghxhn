@@ -20,6 +20,7 @@ export interface FamilyMember {
   deathDateSolar?: string;
   deathTime?: string;
   deathDateLunar?: string;
+  avatar?: string;
 }
 
 export interface AltarPrayer {

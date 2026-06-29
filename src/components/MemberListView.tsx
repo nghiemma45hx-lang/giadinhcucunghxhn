@@ -254,14 +254,31 @@ export default function MemberListView({ members }: MemberListViewProps) {
                 ? 'bg-gradient-to-r from-blue-700 to-blue-500'
                 : 'bg-gradient-to-r from-rose-700 to-rose-500'
             }`}>
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-widest bg-white/20 px-2 py-0.5 rounded-full inline-block mb-1">
-                  Đời thứ {selectedMember.generation} • {selectedMember.branch}
-                </span>
-                <h3 className="text-2xl font-bold font-serif flex items-center gap-2">
-                  {selectedMember.name}
-                  {selectedMember.isDeceased && <span className="text-sm font-normal text-amber-200 font-sans italic">(Khuất bóng †)</span>}
-                </h3>
+              <div className="flex items-center gap-4">
+                {selectedMember.avatar && (
+                  <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-white/80 bg-white/10 shrink-0 shadow-md">
+                    <img 
+                      src={selectedMember.avatar} 
+                      alt={selectedMember.name} 
+                      referrerPolicy="no-referrer"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = selectedMember.gender === 'male' 
+                          ? 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150' 
+                          : 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150';
+                      }}
+                    />
+                  </div>
+                )}
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest bg-white/20 px-2 py-0.5 rounded-full inline-block mb-1">
+                    Đời thứ {selectedMember.generation} • {selectedMember.branch}
+                  </span>
+                  <h3 className="text-2xl font-bold font-serif flex items-center gap-2">
+                    {selectedMember.name}
+                    {selectedMember.isDeceased && <span className="text-sm font-normal text-amber-200 font-sans italic">(Khuất bóng †)</span>}
+                  </h3>
+                </div>
               </div>
               <button
                 onClick={() => setSelectedMember(null)}

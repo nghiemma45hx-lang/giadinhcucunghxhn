@@ -3,6 +3,7 @@ import { Settings, PlusCircle, Trash2, Edit2, Users, Bell, Activity, Save, X, Pl
 // @ts-ignore
 import { getLunarDate } from 'vietnamese-lunar-calendar';
 import { FamilyMember, Announcement, SystemLog, SystemUser } from '../types';
+import { ImageUploader } from './ImageUploader';
 
 interface AdminViewProps {
   members: FamilyMember[];
@@ -64,6 +65,7 @@ export default function AdminView({
   const [occupation, setOccupation] = useState('');
   const [address, setAddress] = useState('');
   const [phone, setPhone] = useState('');
+  const [avatar, setAvatar] = useState('');
 
   const [originalParentId, setOriginalParentId] = useState('');
   const [originalMotherId, setOriginalMotherId] = useState('');
@@ -125,6 +127,7 @@ export default function AdminView({
     setOccupation('');
     setAddress('');
     setPhone('');
+    setAvatar('');
     setOriginalParentId('');
     setOriginalMotherId('');
     setOriginalSpouseId('');
@@ -165,6 +168,7 @@ export default function AdminView({
     setOccupation(member.occupation || '');
     setAddress(member.address || '');
     setPhone(member.phone || '');
+    setAvatar(member.avatar || '');
     setOriginalParentId(member.parentId || '');
     setOriginalMotherId(member.motherId || '');
     setOriginalSpouseId(member.spouseId || '');
@@ -204,6 +208,7 @@ export default function AdminView({
     setOccupation(targetMember.occupation || '');
     setAddress(targetMember.address || '');
     setPhone(targetMember.phone || '');
+    setAvatar(targetMember.avatar || '');
     setOriginalParentId(targetMember.parentId || '');
     setOriginalMotherId(targetMember.motherId || '');
     setOriginalSpouseId(targetMember.spouseId || '');
@@ -270,6 +275,7 @@ export default function AdminView({
       occupation: occupation.trim() || undefined,
       address: address.trim() || undefined,
       phone: phone.trim() || undefined,
+      avatar: avatar.trim() || undefined,
     };
 
     if (editingMember) {
@@ -677,17 +683,14 @@ export default function AdminView({
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block font-bold text-[#6b4724] mb-1">Đường dẫn ảnh nền Banner (URL Ảnh):</label>
-                  <input
-                    type="text"
-                    required
+                  <ImageUploader
                     value={settingsHeroImage}
-                    onChange={(e) => setSettingsHeroImage(e.target.value)}
-                    className="w-full p-2.5 border border-[#d6b583] rounded bg-white font-mono focus:ring-1 focus:ring-[#b8956b] focus:outline-none"
-                    placeholder="Nhập link hình ảnh Unsplash hoặc CDN bất kỳ..."
+                    onChange={setSettingsHeroImage}
+                    label="Đường dẫn ảnh nền Banner (URL Ảnh):"
+                    placeholder="Nhập link hình ảnh Unsplash, CDN hoặc tải từ máy / Google Drive..."
                   />
                   <div className="mt-2 text-[10px] text-gray-400">
-                    Mẹo: Bạn có thể nhập bất kỳ địa chỉ ảnh trực tuyến nào để thay đổi diện mạo trang trọng cho Header dòng tộc.
+                    Mẹo: Bạn có thể tải ảnh trực tiếp từ máy tính, dán liên kết Google Drive (hệ thống tự chuyển đổi) hoặc CDN bất kỳ.
                   </div>
                 </div>
               </div>
@@ -1664,6 +1667,22 @@ export default function AdminView({
                     className="w-full p-2 border border-[#d6b583] rounded bg-[#fdfbf7]"
                     placeholder="Ví dụ: Hòa Xá, Ứng Hòa, Hà Nội"
                   />
+                </div>
+
+                {/* Member Avatar / Image */}
+                <div className="col-span-1 md:col-span-2 p-4 bg-amber-50/20 border border-[#eadecb] rounded-xl space-y-2 shadow-2xs">
+                  <h4 className="font-serif font-bold text-[#6b4724] text-sm border-b border-[#eadecb] pb-1.5 flex items-center gap-2">
+                    <span>🖼️</span> Ảnh chân dung / Tư liệu thành viên
+                  </h4>
+                  <ImageUploader
+                    value={avatar}
+                    onChange={setAvatar}
+                    label="Hình ảnh chân dung (URL hoặc Tải lên):"
+                    placeholder="Dán liên kết ảnh, Google Drive chia sẻ hoặc chọn ảnh tải từ máy..."
+                  />
+                  <p className="text-[10px] text-gray-500 mt-1 block">
+                    Khuyên dùng ảnh chân dung, ảnh thờ hoặc các tư liệu lịch sử liên quan đến thành viên này.
+                  </p>
                 </div>
 
                 {/* Story Biography */}

@@ -932,7 +932,7 @@ Yêu cầu kỹ thuật:
 // 1. Members Endpoints
 const cleanMemberForDb = (m: any) => {
   if (!m) return m;
-  const { spouseIds, deathDateSolar, deathTime, deathDateLunar, ...rest } = m;
+  const { spouseIds, deathDateSolar, deathTime, deathDateLunar, avatar, ...rest } = m;
   return rest;
 };
 
@@ -1311,6 +1311,65 @@ app.post("/api/settings", async (req, res) => {
     localSettings.push(setting);
     saveLocalSettings(localSettings);
     return res.json({ success: true, local: true });
+  }
+});
+
+// Ensure uploads directory exists
+const UPLOADS_DIR = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
+// Serve /uploads statically
+app.use("/uploads", express.static(UPLOADS_DIR));
+
+// Endpoint to upload an image from computer
+app.post("/api/upload-image", (req, res) => {
+  try {
+    const { fileName, base64Data } = req.body;
+    if (!fileName || !base64Data) {
+      return res.status(400).json({ error: "Thiếu tên tệp hoặc dữ liệu Base64" });
+    }
+
+    // Remove metadata prefix (e.g., data:image/png;base64,) if present
+    const base64Clean = base64Data.replace(/^data:image\/\w+;base64,/, "");
+    const buffer = Buffer.from(base64Clean, "base64");
+
+    // Clean file name to prevent directory traversal
+    const safeName = path.basename(fileName).replace(/[^a-zA-Z0-9.-]/g, "_");
+    const uniqueName = `${Date.now()}-${safeName}`;
+    const filePath = path.join(UPLOADS_DIR, uniqueName);
+
+    fs.writeFileSync(filePath, buffer);
+
+    return res.json({ success: true, url: `/uploads/${uniqueName}` });
+  } catch (error: any) {
+    console.error("Upload error:", error);
+    return res.status(500).json({ error: "Lỗi tải ảnh lên: " + error.message });
+  }
+});
+
+// Endpoint to delete an image
+app.post("/api/delete-image", (req, res) => {
+  try {
+    const { url } = req.body;
+    if (!url) {
+      return res.status(400).json({ error: "Thiếu đường dẫn ảnh cần xóa" });
+    }
+
+    // Only allow deleting files inside the uploads directory
+    if (url.startsWith("/uploads/")) {
+      const fileName = path.basename(url);
+      const filePath = path.join(UPLOADS_DIR, fileName);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+        return res.json({ success: true, message: "Đã xóa ảnh thành công khỏi máy chủ" });
+      }
+    }
+    return res.json({ success: true, message: "Đường dẫn không hợp lệ hoặc tệp không tồn tại, chỉ xóa liên kết" });
+  } catch (error: any) {
+    console.error("Delete error:", error);
+    return res.status(500).json({ error: "Lỗi xóa ảnh: " + error.message });
   }
 });
 
