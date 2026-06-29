@@ -51,6 +51,9 @@ export default function AdminView({
   const [role, setRole] = useState('');
   const [birthYear, setBirthYear] = useState('');
   const [deathYear, setDeathYear] = useState('');
+  const [deathDateSolar, setDeathDateSolar] = useState('');
+  const [deathTime, setDeathTime] = useState('');
+  const [deathDateLunar, setDeathDateLunar] = useState('');
   const [isDeceased, setIsDeceased] = useState(false);
   const [parentId, setParentId] = useState('');
   const [motherId, setMotherId] = useState('');
@@ -109,6 +112,9 @@ export default function AdminView({
     setRole('');
     setBirthYear('');
     setDeathYear('');
+    setDeathDateSolar('');
+    setDeathTime('');
+    setDeathDateLunar('');
     setIsDeceased(false);
     setParentId('');
     setMotherId('');
@@ -138,6 +144,9 @@ export default function AdminView({
     setRole(member.role);
     setBirthYear(member.birthYear || '');
     setDeathYear(member.deathYear || '');
+    setDeathDateSolar(member.deathDateSolar || '');
+    setDeathTime(member.deathTime || '');
+    setDeathDateLunar(member.deathDateLunar || '');
     setIsDeceased(member.isDeceased);
     setParentId(member.parentId || '');
     setMotherId(member.motherId || '');
@@ -174,6 +183,9 @@ export default function AdminView({
     setRole(targetMember.role);
     setBirthYear(targetMember.birthYear || '');
     setDeathYear(targetMember.deathYear || '');
+    setDeathDateSolar(targetMember.deathDateSolar || '');
+    setDeathTime(targetMember.deathTime || '');
+    setDeathDateLunar(targetMember.deathDateLunar || '');
     setIsDeceased(targetMember.isDeceased);
     setParentId(targetMember.parentId || '');
     setMotherId(targetMember.motherId || '');
@@ -225,6 +237,17 @@ export default function AdminView({
     const finalName = name.trim() || 'Khuyết danh';
     const finalRole = role.trim() || 'Chưa rõ vai vế';
 
+    let calculatedDeathYear = deathYear.trim();
+    if (isDeceased && deathDateSolar) {
+      const match = deathDateSolar.trim().match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/) || deathDateSolar.trim().match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+      if (match) {
+        const yr = match[3] && match[3].length === 4 ? match[3] : match[1];
+        if (yr && yr.length === 4 && !isNaN(Number(yr))) {
+          calculatedDeathYear = yr;
+        }
+      }
+    }
+
     const payload: FamilyMember = {
       id: editingMember ? editingMember.id : `mem-${Date.now()}`,
       name: finalName,
@@ -232,7 +255,10 @@ export default function AdminView({
       generation: Number(generation),
       role: finalRole,
       birthYear: birthYear.trim() || undefined,
-      deathYear: isDeceased ? (deathYear.trim() || undefined) : undefined,
+      deathYear: isDeceased ? (calculatedDeathYear || undefined) : undefined,
+      deathDateSolar: isDeceased ? (deathDateSolar.trim() || undefined) : undefined,
+      deathTime: isDeceased ? (deathTime.trim() || undefined) : undefined,
+      deathDateLunar: isDeceased ? (deathDateLunar.trim() || undefined) : undefined,
       isDeceased,
       parentId: parentId || undefined,
       motherId: motherId || undefined,
@@ -278,11 +304,24 @@ export default function AdminView({
   const convertSolarToLunarStr = (dateStr: string): string | null => {
     if (!dateStr) return null;
     const cleaned = dateStr.trim();
-    const match = cleaned.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-    if (!match) return null;
-    const d = parseInt(match[1], 10);
-    const m = parseInt(match[2], 10);
-    const y = parseInt(match[3], 10);
+    let d = 0, m = 0, y = 0;
+    
+    // Check YYYY-MM-DD
+    const matchYMD = cleaned.match(/^(\d{4})[\-\/](\d{1,2})[\-\/](\d{1,2})$/);
+    if (matchYMD) {
+      y = parseInt(matchYMD[1], 10);
+      m = parseInt(matchYMD[2], 10);
+      d = parseInt(matchYMD[3], 10);
+    } else {
+      // Check DD/MM/YYYY
+      const matchDMY = cleaned.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+      if (!matchDMY) return null;
+      d = parseInt(matchDMY[1], 10);
+      m = parseInt(matchDMY[2], 10);
+      y = parseInt(matchDMY[3], 10);
+    }
+    
+    if (isNaN(d) || isNaN(m) || isNaN(y)) return null;
     try {
       // @ts-ignore
       const res = getLunarDate(d, m, y);
@@ -980,30 +1019,114 @@ export default function AdminView({
                   </div>
                 </div>
 
-                {/* Death Year */}
+                {/* Death Year & Detailed Info */}
                 {isDeceased && (
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <label className="block font-bold text-red-600">Năm tạ thế †:</label>
-                      {deathYear && getCanChi(deathYear) && (
-                        <span className="text-xs text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded font-bold">
-                          Âm lịch: {getCanChi(deathYear)}
-                        </span>
-                      )}
-                    </div>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={deathYear}
-                        onChange={(e) => setDeathYear(e.target.value)}
-                        className="w-full p-2 border border-red-300 rounded bg-red-50/50 pr-24"
-                        placeholder="Ví dụ: 2012"
-                      />
-                      {birthYear && deathYear && !isNaN(parseYearStr(birthYear)) && !isNaN(parseYearStr(deathYear)) && (
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-semibold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">
-                          Mất lúc: {parseYearStr(deathYear) - parseYearStr(birthYear)} tuổi
-                        </span>
-                      )}
+                  <div className="col-span-1 md:col-span-2 p-4 bg-rose-50/20 border border-rose-100 rounded-xl space-y-4 shadow-2xs">
+                    <h4 className="font-serif font-bold text-rose-800 text-sm border-b border-rose-100 pb-2 flex items-center gap-2">
+                      <span>🕯️</span> Thông tin tạ thế chi tiết
+                    </h4>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Solar Date of Death */}
+                      <div>
+                        <label className="block text-xs font-bold text-rose-700 mb-1">Ngày, tháng, năm mất (Dương lịch):</label>
+                        <input
+                          type="date"
+                          value={deathDateSolar ? (deathDateSolar.includes('/') ? deathDateSolar.split('/').reverse().join('-') : deathDateSolar) : ''}
+                          onChange={(e) => {
+                            const val = e.target.value; // YYYY-MM-DD
+                            if (val) {
+                              const parts = val.split('-');
+                              const formatted = `${parts[2]}/${parts[1]}/${parts[0]}`; // DD/MM/YYYY
+                              setDeathDateSolar(formatted);
+                              setDeathYear(parts[0]);
+                              const lunar = convertSolarToLunarStr(formatted);
+                              if (lunar) {
+                                setDeathDateLunar(lunar);
+                              }
+                            } else {
+                              setDeathDateSolar('');
+                              setDeathDateLunar('');
+                            }
+                          }}
+                          className="w-full p-2 text-sm border border-rose-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-rose-400"
+                        />
+                        <span className="text-[10px] text-gray-500 mt-1 block">Hoặc nhập tay định dạng Ngày/Tháng/Năm bên dưới:</span>
+                        <input
+                          type="text"
+                          value={deathDateSolar}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setDeathDateSolar(val);
+                            const lunar = convertSolarToLunarStr(val);
+                            if (lunar) {
+                              setDeathDateLunar(lunar);
+                            }
+                          }}
+                          placeholder="Ví dụ: 29/06/2012"
+                          className="w-full mt-1 p-2 text-sm border border-rose-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-rose-400"
+                        />
+                      </div>
+
+                      {/* Hour/Minute of Death */}
+                      <div>
+                        <label className="block text-xs font-bold text-rose-700 mb-1">Giờ, phút mất (nếu có):</label>
+                        <div className="flex gap-2">
+                          <input
+                            type="time"
+                            value={deathTime && deathTime.match(/^\d{2}:\d{2}$/) ? deathTime : ''}
+                            onChange={(e) => setDeathTime(e.target.value)}
+                            className="p-2 text-sm border border-rose-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-rose-400 shrink-0"
+                          />
+                          <input
+                            type="text"
+                            value={deathTime}
+                            onChange={(e) => setDeathTime(e.target.value)}
+                            placeholder="Ví dụ: 09:30 hoặc Giờ Ngọ"
+                            className="w-full p-2 text-sm border border-rose-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-rose-400"
+                          />
+                        </div>
+                        <span className="text-[10px] text-gray-500 mt-1 block">Có thể chọn giờ số hoặc gõ giờ truyền thống (Giờ Tý, Ngọ...)</span>
+                      </div>
+
+                      {/* Death Year (Calculated / Editable) */}
+                      <div>
+                        <div className="flex justify-between items-center mb-1">
+                          <label className="block text-xs font-bold text-rose-700">Năm tạ thế (Dương lịch):</label>
+                          {deathYear && getCanChi(deathYear) && (
+                            <span className="text-[10px] text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded font-bold">
+                              Năm Can Chi: {getCanChi(deathYear)}
+                            </span>
+                          )}
+                        </div>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={deathYear}
+                            onChange={(e) => setDeathYear(e.target.value)}
+                            className="w-full p-2 text-sm border border-rose-200 rounded-lg bg-white pr-20 focus:outline-none focus:ring-2 focus:ring-rose-400"
+                            placeholder="Ví dụ: 2012"
+                          />
+                          {birthYear && deathYear && !isNaN(parseYearStr(birthYear)) && !isNaN(parseYearStr(deathYear)) && (
+                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">
+                              Hưởng thọ: {parseYearStr(deathYear) - parseYearStr(birthYear)} tuổi
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Automatically Translated Lunar Date */}
+                      <div>
+                        <label className="block text-xs font-bold text-rose-700 mb-1">Ngày mất Âm lịch (Tự dịch):</label>
+                        <input
+                          type="text"
+                          value={deathDateLunar}
+                          onChange={(e) => setDeathDateLunar(e.target.value)}
+                          placeholder="Tự động dịch khi nhập ngày Dương lịch"
+                          className="w-full p-2 text-sm border border-rose-200 rounded-lg bg-rose-50 font-semibold text-rose-700 placeholder-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-400"
+                        />
+                        <span className="text-[10px] text-gray-500 mt-1 block">Chỉnh sửa lại tự do nếu muốn bổ sung thông tin chi tiết.</span>
+                      </div>
                     </div>
                   </div>
                 )}

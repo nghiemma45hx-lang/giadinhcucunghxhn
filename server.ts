@@ -930,6 +930,12 @@ Yêu cầu kỹ thuật:
 });
 
 // 1. Members Endpoints
+const cleanMemberForDb = (m: any) => {
+  if (!m) return m;
+  const { spouseIds, deathDateSolar, deathTime, deathDateLunar, ...rest } = m;
+  return rest;
+};
+
 app.get("/api/members", async (req, res) => {
   try {
     const supabase = getSupabaseClient();
@@ -949,12 +955,12 @@ app.get("/api/members", async (req, res) => {
       console.log("family_members table is empty, auto-seeding default data...");
       const { error: insertError } = await supabase.from("family_members").insert(initialMembers);
       if (insertError) {
-        if (insertError.message && (insertError.message.includes("spouseIds") || insertError.message.includes("column"))) {
-          console.log("Missing spouseIds column detected in DB. Seeding cleaned version instead...");
-          const cleanedMembers = initialMembers.map(({ spouseIds, ...rest }) => rest);
+        if (insertError.message && (insertError.message.includes("spouseIds") || insertError.message.includes("column") || insertError.message.includes("does not exist") || insertError.message.includes("has no column"))) {
+          console.log("Missing newer columns detected in DB. Seeding cleaned version instead...");
+          const cleanedMembers = initialMembers.map(cleanMemberForDb);
           const { error: retryError } = await supabase.from("family_members").insert(cleanedMembers);
           if (retryError) {
-            console.log("Failed to seed family_members even without spouseIds:", retryError.message || retryError);
+            console.log("Failed to seed family_members even without newer columns:", retryError.message || retryError);
             return res.json({ tablesNeedInitialization: true, data: [] });
           }
           return res.json({ data: cleanedMembers });
@@ -997,9 +1003,9 @@ app.post("/api/members/sync", async (req, res) => {
 
     let { data, error } = await supabase.from("family_members").upsert(preparedMembers).select();
     if (error) {
-      if (error.message && (error.message.includes("spouseIds") || error.message.includes("column"))) {
-        console.warn("Bulk sync failed with spouseIds column error. Retrying without 'spouseIds'.");
-        const cleanedMembers = preparedMembers.map(({ spouseIds, ...rest }: any) => rest);
+      if (error.message && (error.message.includes("spouseIds") || error.message.includes("column") || error.message.includes("does not exist") || error.message.includes("has no column"))) {
+        console.warn("Bulk sync failed with schema column error. Retrying with cleaned columns.");
+        const cleanedMembers = preparedMembers.map(cleanMemberForDb);
         const retryResult = await supabase.from("family_members").upsert(cleanedMembers).select();
         if (retryResult.error) throw retryResult.error;
         data = retryResult.data;
@@ -1020,9 +1026,9 @@ app.post("/api/members", async (req, res) => {
     const member = req.body;
     let { data, error } = await supabase.from("family_members").insert([member]).select();
     if (error) {
-      if (error.message && (error.message.includes("spouseIds") || error.message.includes("column"))) {
-        console.warn("POST /api/members failed with spouseIds column error. Retrying without 'spouseIds'.");
-        const { spouseIds, ...cleanedMember } = member;
+      if (error.message && (error.message.includes("spouseIds") || error.message.includes("column") || error.message.includes("does not exist") || error.message.includes("has no column"))) {
+        console.warn("POST /api/members failed with schema column error. Retrying with cleaned columns.");
+        const cleanedMember = cleanMemberForDb(member);
         const retryResult = await supabase.from("family_members").insert([cleanedMember]).select();
         if (retryResult.error) throw retryResult.error;
         data = retryResult.data;
@@ -1044,9 +1050,9 @@ app.put("/api/members/:id", async (req, res) => {
     const member = req.body;
     let { error } = await supabase.from("family_members").update(member).eq("id", id);
     if (error) {
-      if (error.message && (error.message.includes("spouseIds") || error.message.includes("column"))) {
-        console.warn("PUT /api/members failed with spouseIds column error. Retrying without 'spouseIds'.");
-        const { spouseIds, ...cleanedMember } = member;
+      if (error.message && (error.message.includes("spouseIds") || error.message.includes("column") || error.message.includes("does not exist") || error.message.includes("has no column"))) {
+        console.warn("PUT /api/members failed with schema column error. Retrying with cleaned columns.");
+        const cleanedMember = cleanMemberForDb(member);
         const retryResult = await supabase.from("family_members").update(cleanedMember).eq("id", id);
         if (retryResult.error) throw retryResult.error;
         error = null;

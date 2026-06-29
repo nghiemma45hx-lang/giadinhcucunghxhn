@@ -1323,6 +1323,9 @@ CREATE TABLE IF NOT EXISTS family_members (
   role TEXT NOT NULL,
   "birthYear" TEXT,
   "deathYear" TEXT,
+  "deathDateSolar" TEXT,
+  "deathTime" TEXT,
+  "deathDateLunar" TEXT,
   "isDeceased" BOOLEAN NOT NULL DEFAULT false,
   "parentId" TEXT,
   "spouseId" TEXT,
@@ -1337,6 +1340,9 @@ CREATE TABLE IF NOT EXISTS family_members (
 
 -- Thêm cột "spouseIds" vào bảng family_members nếu đã tạo trước đó
 ALTER TABLE family_members ADD COLUMN IF NOT EXISTS "spouseIds" TEXT[];
+ALTER TABLE family_members ADD COLUMN IF NOT EXISTS "deathDateSolar" TEXT;
+ALTER TABLE family_members ADD COLUMN IF NOT EXISTS "deathTime" TEXT;
+ALTER TABLE family_members ADD COLUMN IF NOT EXISTS "deathDateLunar" TEXT;
 
 -- 2. Tạo bảng announcements
 CREATE TABLE IF NOT EXISTS announcements (
@@ -1394,6 +1400,9 @@ CREATE TABLE IF NOT EXISTS family_members (
   role TEXT NOT NULL,
   "birthYear" TEXT,
   "deathYear" TEXT,
+  "deathDateSolar" TEXT,
+  "deathTime" TEXT,
+  "deathDateLunar" TEXT,
   "isDeceased" BOOLEAN NOT NULL DEFAULT false,
   "parentId" TEXT,
   "spouseId" TEXT,
@@ -1408,6 +1417,9 @@ CREATE TABLE IF NOT EXISTS family_members (
 
 -- Thêm cột "spouseIds" vào bảng family_members nếu đã tạo trước đó
 ALTER TABLE family_members ADD COLUMN IF NOT EXISTS "spouseIds" TEXT[];
+ALTER TABLE family_members ADD COLUMN IF NOT EXISTS "deathDateSolar" TEXT;
+ALTER TABLE family_members ADD COLUMN IF NOT EXISTS "deathTime" TEXT;
+ALTER TABLE family_members ADD COLUMN IF NOT EXISTS "deathDateLunar" TEXT;
 
 -- 2. Tạo bảng announcements
 CREATE TABLE IF NOT EXISTS announcements (

@@ -17,6 +17,9 @@ export interface FamilyMember {
   occupation?: string;
   address?: string;
   phone?: string;
+  deathDateSolar?: string;
+  deathTime?: string;
+  deathDateLunar?: string;
 }
 
 export interface AltarPrayer {
