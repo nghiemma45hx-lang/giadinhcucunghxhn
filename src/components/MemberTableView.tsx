@@ -707,15 +707,100 @@ export default function MemberTableView({
 
                 {/* Bầu đoàn dòng tộc card */}
                 <div className="col-span-1 md:col-span-2 p-3.5 bg-[#fdfbf7] rounded-xl border border-[#eadecb] space-y-3">
-                  <div className="flex justify-between items-center border-b border-[#eadecb] pb-2">
+                  <div className="flex justify-between items-center border-b border-[#eadecb] pb-2 flex-wrap gap-2">
                     <span className="font-bold text-[#6b4724] text-xs flex items-center gap-1.5">
                       👥 Bầu đoàn nhà cụ/ông/bác/anh (Thân tộc liên quan)
                     </span>
-                    {fatherInfo && (
-                      <span className="text-[10px] bg-[#6b4724] text-white font-bold px-2 py-0.5 rounded-full">
-                        Nhà đời {fatherInfo.generation}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {fatherInfo && (
+                        <span className="text-[10px] bg-[#6b4724] text-white font-bold px-2 py-0.5 rounded-full shrink-0">
+                          Nhà đời {fatherInfo.generation}
+                        </span>
+                      )}
+                      
+                      {/* Khung điều khiển liên kết Sửa / Xóa / Hoàn tác (Undo) góc phải trên */}
+                      <div className="flex items-center gap-1.5 border border-rose-400 bg-rose-50/70 p-1 rounded-lg shadow-2xs shrink-0">
+                        <span className="text-[9px] font-bold text-rose-800 px-1">Thao tác nhanh:</span>
+                        
+                        {/* Sửa / Xóa Cha */}
+                        {parentId ? (
+                          <div className="flex items-center gap-1 bg-white border border-rose-200 rounded px-1.5 py-0.5 text-[9px] font-semibold">
+                            <span className="text-amber-900">Cha:</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const target = members.find(m => m.id === parentId);
+                                if (target) handleSwitchToMember(target);
+                              }}
+                              className="text-amber-800 hover:underline font-bold cursor-pointer"
+                              title="Sửa Cha"
+                            >
+                              Sửa
+                            </button>
+                            <span className="text-rose-200">|</span>
+                            <button
+                              type="button"
+                              onClick={() => setParentId('')}
+                              className="text-rose-600 hover:underline font-bold cursor-pointer"
+                              title="Xóa liên kết Cha"
+                            >
+                              Xóa
+                            </button>
+                          </div>
+                        ) : null}
+                        {parentId !== originalParentId && (
+                          <button
+                            type="button"
+                            onClick={() => setParentId(originalParentId)}
+                            className="text-[9px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded hover:bg-blue-200 font-bold cursor-pointer shrink-0"
+                            title="Hoàn tác thay đổi liên kết Cha"
+                          >
+                            Hoàn Cha
+                          </button>
+                        )}
+
+                        {/* Sửa / Xóa Vợ/Chồng */}
+                        {spouseId ? (
+                          <div className="flex items-center gap-1 bg-white border border-rose-200 rounded px-1.5 py-0.5 text-[9px] font-semibold">
+                            <span className="text-amber-900">Phối:</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const target = members.find(m => m.id === spouseId);
+                                if (target) handleSwitchToMember(target);
+                              }}
+                              className="text-amber-800 hover:underline font-bold cursor-pointer"
+                              title="Sửa Vợ/Chồng"
+                            >
+                              Sửa
+                            </button>
+                            <span className="text-rose-200">|</span>
+                            <button
+                              type="button"
+                              onClick={() => setSpouseId('')}
+                              className="text-rose-600 hover:underline font-bold cursor-pointer"
+                              title="Xóa liên kết Vợ/Chồng"
+                            >
+                              Xóa
+                            </button>
+                          </div>
+                        ) : null}
+                        {spouseId !== originalSpouseId && (
+                          <button
+                            type="button"
+                            onClick={() => setSpouseId(originalSpouseId)}
+                            className="text-[9px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded hover:bg-blue-200 font-bold cursor-pointer shrink-0"
+                            title="Hoàn tác thay đổi liên kết Vợ/Chồng"
+                          >
+                            Hoàn Phối
+                          </button>
+                        )}
+
+                        {!parentId && !spouseId && (
+                          <span className="text-[9px] text-rose-700 italic px-1">Chưa có liên kết</span>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
                   {fatherInfo ? (
@@ -798,15 +883,16 @@ export default function MemberTableView({
 
                   {/* Textarea inside the Bầu đoàn card */}
                   <div className="mt-3.5 pt-3 border-t border-[#eadecb]">
-                    <label className="block font-bold text-[#6b4724] mb-1">
-                      Nhập thông tin bầu đoàn liên quan / ghi chú khác:
+                    <label className="block font-bold text-[#6b4724] mb-1 flex items-center justify-between flex-wrap gap-1">
+                      <span>🌸 Bổ sung thông tin Dâu của gia đình / thông tin liên quan khác:</span>
+                      <span className="text-[9px] bg-rose-100 text-rose-800 font-bold px-2 py-0.5 rounded-sm">Khu vực bổ sung thông tin Dâu & Thân tộc</span>
                     </label>
                     <textarea
                       rows={3}
                       value={relationNotes}
                       onChange={(e) => setRelationNotes(e.target.value)}
-                      className="w-full p-2 border border-[#d6b583] rounded bg-white text-[11px] text-[#5c4021] placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-[#b8956b] resize-none animate-in fade-in duration-200"
-                      placeholder="Hãy nhập thêm thông tin chi tiết về bầu đoàn gia đình, vợ thứ, các con cháu, hoặc các mối quan hệ thân tộc khác tại đây..."
+                      className="w-full p-2.5 border border-rose-300 rounded-lg bg-white text-[11px] text-[#5c4021] placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-rose-400 focus:border-rose-400 resize-none animate-in fade-in duration-200"
+                      placeholder="Hãy nhập thêm thông tin chi tiết về các nàng Dâu trong gia đình (Họ tên dâu, quê quán, dòng dõi, thứ bậc của chồng, đóng góp đóng họ...), hoặc thông tin con cháu khác tại đây..."
                     />
                   </div>
                 </div>
