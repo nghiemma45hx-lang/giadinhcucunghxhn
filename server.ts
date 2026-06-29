@@ -939,8 +939,10 @@ app.get("/api/members", async (req, res) => {
       .order("generation", { ascending: true });
 
     if (error) {
+      const dbErr = JSON.stringify(error, null, 2);
+      fs.appendFileSync(path.join(process.cwd(), "debug.log"), `\n\nDatabase query error: ${dbErr}\n`);
       console.log("family_members database query status:", error.message || error);
-      return res.json({ tablesNeedInitialization: true, data: [] });
+      return res.json({ tablesNeedInitialization: true, dbError: error, data: [] });
     }
 
     if (!data || data.length === 0) {

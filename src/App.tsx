@@ -996,6 +996,10 @@ export default function App() {
             <div className="flex items-center gap-2">
               <TreeDeciduous className="w-6 h-6 text-[#d6b583]" />
               <span className="font-serif font-bold text-sm tracking-wide hidden sm:inline text-[#d6b583]">Nghiêm Gia Hệ</span>
+              <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-emerald-950/40 text-emerald-300 border border-emerald-900/40 font-bold ml-1 shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>Supabase Động</span>
+              </span>
             </div>
 
             {/* Nav links */}
