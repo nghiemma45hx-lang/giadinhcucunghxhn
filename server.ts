@@ -49,27 +49,27 @@ const cleanEnvVar = (val: string | undefined): string | undefined => {
 const getSupabaseClient = () => {
   let url = cleanEnvVar(process.env.SUPABASE_URL);
   let key = cleanEnvVar(process.env.SUPABASE_SERVICE_ROLE_KEY);
+  const anon = cleanEnvVar(process.env.SUPABASE_ANON_KEY);
 
   const fallbackUrl = "https://domczpyfjiqttwdcrdsj.supabase.co";
   const fallbackKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRvbWN6cHlmamlxdHR3ZGNyZHNqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjcwMTM5NCwiZXhwIjoyMDk4Mjc3Mzk0fQ.-2ksd7TQPy6hDPwE2S2OWUzWC0ws04FjecgL2lhRWf0";
 
-  if (!url || url === "MY_SUPABASE_URL" || !url.startsWith("http")) {
-    url = fallbackUrl;
-  }
+  const isCustomProject = url && url !== "MY_SUPABASE_URL" && url.startsWith("http") && !url.includes("domczpyfjiqttwdcrdsj.supabase.co");
 
-  // If using the default Supabase project, force use the correct full key
-  if (url.includes("domczpyfjiqttwdcrdsj.supabase.co")) {
-    key = fallbackKey;
-  } else if (
-    !key || 
-    key === "MY_SUPABASE_SERVICE_ROLE_KEY" || 
-    key === "SUPABASE_SERVICE_ROLE_KEY" ||
-    key.startsWith("YOUR_") || 
-    key.startsWith("your_") ||
-    key.includes("SERVICE_ROLE") ||
-    key.includes("service_role") ||
-    !key.startsWith("eyJ")
-  ) {
+  if (isCustomProject) {
+    const hasValidKey = key && key !== "MY_SUPABASE_SERVICE_ROLE_KEY" && key !== "SUPABASE_SERVICE_ROLE_KEY" && key.startsWith("eyJ");
+    const hasValidAnon = anon && anon !== "MY_SUPABASE_ANON_KEY" && anon !== "SUPABASE_ANON_KEY" && anon.startsWith("eyJ");
+    
+    if (hasValidKey) {
+      // Keep using their service role key
+    } else if (hasValidAnon) {
+      key = anon; // Fallback to their anon key if service role is missing
+    } else {
+      url = fallbackUrl;
+      key = fallbackKey;
+    }
+  } else {
+    url = fallbackUrl;
     key = fallbackKey;
   }
 
@@ -78,6 +78,48 @@ const getSupabaseClient = () => {
       persistSession: false,
     }
   });
+};
+
+// Local JSON Fallback Storage Helpers for system_users and system_settings
+const USERS_FILE = path.join(process.cwd(), "local_users.json");
+const SETTINGS_FILE = path.join(process.cwd(), "local_settings.json");
+
+const getLocalUsers = (): any[] => {
+  try {
+    if (fs.existsSync(USERS_FILE)) {
+      return JSON.parse(fs.readFileSync(USERS_FILE, "utf-8"));
+    }
+  } catch (e) {
+    console.error("Failed to read local users:", e);
+  }
+  return [];
+};
+
+const saveLocalUsers = (users: any[]) => {
+  try {
+    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), "utf-8");
+  } catch (e) {
+    console.error("Failed to write local users:", e);
+  }
+};
+
+const getLocalSettings = (): any[] => {
+  try {
+    if (fs.existsSync(SETTINGS_FILE)) {
+      return JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf-8"));
+    }
+  } catch (e) {
+    console.error("Failed to read local settings:", e);
+  }
+  return [];
+};
+
+const saveLocalSettings = (settings: any[]) => {
+  try {
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2), "utf-8");
+  } catch (e) {
+    console.error("Failed to write local settings:", e);
+  }
 };
 
 // Helper to check if a Supabase error is a relation/table-not-found error
@@ -326,12 +368,14 @@ app.get("/api/users", async (req, res) => {
     const { data, error } = await supabase.from("system_users").select("*");
     if (error) {
       console.log("system_users table query status:", error.message || error);
-      return res.json({ tablesNeedInitialization: true, data: [] });
+      const localUsers = getLocalUsers();
+      return res.json({ data: localUsers });
     }
     return res.json({ data: data || [] });
   } catch (error: any) {
     console.error("GET /api/users error:", error?.message || error);
-    return res.json({ data: [] });
+    const localUsers = getLocalUsers();
+    return res.json({ data: localUsers });
   }
 });
 
@@ -340,11 +384,23 @@ app.post("/api/users", async (req, res) => {
     const supabase = getSupabaseClient();
     const user = req.body;
     const { error } = await supabase.from("system_users").upsert([user]);
-    if (error) throw error;
+    if (error) {
+      console.warn("system_users upsert failed, saving to local file fallback instead:", error.message);
+      let localUsers = getLocalUsers();
+      localUsers = localUsers.filter((u: any) => u.username !== user.username);
+      localUsers.push(user);
+      saveLocalUsers(localUsers);
+      return res.json({ success: true, local: true });
+    }
     return res.json({ success: true });
   } catch (error: any) {
     console.error("POST /api/users error:", error);
-    return res.status(500).json({ error: error.message });
+    const user = req.body;
+    let localUsers = getLocalUsers();
+    localUsers = localUsers.filter((u: any) => u.username !== user.username);
+    localUsers.push(user);
+    saveLocalUsers(localUsers);
+    return res.json({ success: true, local: true });
   }
 });
 
@@ -353,11 +409,21 @@ app.delete("/api/users/:username", async (req, res) => {
     const supabase = getSupabaseClient();
     const { username } = req.params;
     const { error } = await supabase.from("system_users").delete().eq("username", username);
-    if (error) throw error;
+    if (error) {
+      console.warn("system_users delete failed, deleting from local file fallback instead:", error.message);
+      let localUsers = getLocalUsers();
+      localUsers = localUsers.filter((u: any) => u.username !== username);
+      saveLocalUsers(localUsers);
+      return res.json({ success: true, local: true });
+    }
     return res.json({ success: true });
   } catch (error: any) {
     console.error("DELETE /api/users error:", error);
-    return res.status(500).json({ error: error.message });
+    const { username } = req.params;
+    let localUsers = getLocalUsers();
+    localUsers = localUsers.filter((u: any) => u.username !== username);
+    saveLocalUsers(localUsers);
+    return res.json({ success: true, local: true });
   }
 });
 
@@ -368,12 +434,14 @@ app.get("/api/settings", async (req, res) => {
     const { data, error } = await supabase.from("system_settings").select("*");
     if (error) {
       console.log("system_settings table query status:", error.message || error);
-      return res.json({ tablesNeedInitialization: true, data: [] });
+      const localSettings = getLocalSettings();
+      return res.json({ data: localSettings });
     }
     return res.json({ data: data || [] });
   } catch (error: any) {
     console.error("GET /api/settings error:", error?.message || error);
-    return res.json({ data: [] });
+    const localSettings = getLocalSettings();
+    return res.json({ data: localSettings });
   }
 });
 
@@ -382,11 +450,23 @@ app.post("/api/settings", async (req, res) => {
     const supabase = getSupabaseClient();
     const setting = req.body;
     const { error } = await supabase.from("system_settings").upsert([setting]);
-    if (error) throw error;
+    if (error) {
+      console.warn("system_settings upsert failed, saving to local file fallback instead:", error.message);
+      let localSettings = getLocalSettings();
+      localSettings = localSettings.filter((s: any) => s.key !== setting.key);
+      localSettings.push(setting);
+      saveLocalSettings(localSettings);
+      return res.json({ success: true, local: true });
+    }
     return res.json({ success: true });
   } catch (error: any) {
     console.error("POST /api/settings error:", error);
-    return res.status(500).json({ error: error.message });
+    const setting = req.body;
+    let localSettings = getLocalSettings();
+    localSettings = localSettings.filter((s: any) => s.key !== setting.key);
+    localSettings.push(setting);
+    saveLocalSettings(localSettings);
+    return res.json({ success: true, local: true });
   }
 });
 
