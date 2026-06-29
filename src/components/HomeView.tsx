@@ -9,6 +9,7 @@ interface HomeViewProps {
   onPrint: () => void;
   onExportWord: () => void;
   onExportPdf: () => void;
+  settings?: Record<string, string>;
 }
 
 export default function HomeView({
@@ -18,6 +19,7 @@ export default function HomeView({
   onPrint,
   onExportWord,
   onExportPdf,
+  settings,
 }: HomeViewProps) {
   const livingCount = members.filter((m) => !m.isDeceased).length;
   const deceasedCount = members.filter((m) => m.isDeceased).length;
@@ -99,15 +101,9 @@ export default function HomeView({
             Lời Tựa Gia Tộc
           </h2>
           <div className="text-[#4a331a] leading-relaxed space-y-4 text-justify text-base">
-            <p>
-              Cây có gốc mới nở cành xanh ngọn, nước có nguồn mới bể rộng sông sâu. Người có tổ tông mới sinh con cháu, hiếu nghĩa vẹn tròn mới rạng rỡ tổ tiên.
-            </p>
-            <p>
-              Gia phả gia đình dòng họ <strong>Cụ Nghiêm Cung</strong> (kế thừa dòng dõi cụ cố <strong>Nghiêm Điều (Chu)</strong> tại vùng đất Hòa Xá cổ kính, giàu truyền thống cách mạng) được lập ra nhằm mục đích kính cáo tổ tông, ghi chép tường tận huyết mạch dòng giống, lưu truyền cho con cháu vạn đời sau không bao giờ quên đi nguồn cội thiêng liêng của mình.
-            </p>
-            <p>
-              Trải qua bao thăng trầm của lịch sử, con cháu họ Nghiêm luôn gìn giữ nếp gia phong nghiêm cẩn, lấy hiếu học làm đầu, lấy đức độ làm trọng, lấy trung thực làm gương và hết lòng đùm bọc, giúp đỡ lẫn nhau vượt qua gian khó, lập thân kiến nghiệp làm rạng danh gia đình.
-            </p>
+            <p dangerouslySetInnerHTML={{ __html: settings?.introText1 || "Cây có gốc mới nở cành xanh ngọn, nước có nguồn mới bể rộng sông sâu. Người có tổ tông mới sinh con cháu, hiếu nghĩa vẹn tròn mới rạng rỡ tổ tiên." }} />
+            <p dangerouslySetInnerHTML={{ __html: settings?.introText2 || "Gia phả gia đình dòng họ <strong>Cụ Nghiêm Cung</strong> (kế thừa dòng dõi cụ cố <strong>Nghiêm Điều (Chu)</strong> tại vùng đất Hòa Xá cổ kính, giàu truyền thống cách mạng) được lập ra nhằm mục đích kính cáo tổ tông, ghi chép tường tận huyết mạch dòng giống, lưu truyền cho con cháu vạn đời sau không bao giờ quên đi nguồn cội thiêng liêng của mình." }} />
+            <p dangerouslySetInnerHTML={{ __html: settings?.introText3 || "Trải qua bao thăng trầm của lịch sử, con cháu họ Nghiêm luôn gìn giữ nếp gia phong nghiêm cẩn, lấy hiếu học làm đầu, lấy đức độ làm trọng, lấy trung thực làm gương và hết lòng đùm bọc, giúp đỡ lẫn nhau vượt qua gian khó, lập thân kiến nghiệp làm rạng danh gia đình." }} />
           </div>
 
           {/* Quick Stats Dashboard */}

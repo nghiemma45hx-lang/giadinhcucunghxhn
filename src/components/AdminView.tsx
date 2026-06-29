@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Settings, PlusCircle, Trash2, Edit2, Users, Bell, Activity, Save, X, Plus } from 'lucide-react';
-import { FamilyMember, Announcement, SystemLog } from '../types';
+import { Settings, PlusCircle, Trash2, Edit2, Users, Bell, Activity, Save, X, Plus, Image, Key, Shield } from 'lucide-react';
+import { FamilyMember, Announcement, SystemLog, SystemUser } from '../types';
 
 interface AdminViewProps {
   members: FamilyMember[];
@@ -11,6 +11,13 @@ interface AdminViewProps {
   onDeleteMember: (id: string) => void;
   onAddAnnouncement: (announcement: Announcement) => void;
   onDeleteAnnouncement: (id: string) => void;
+  // Banner & Gia tộc settings
+  settings: Record<string, string>;
+  onSaveSetting: (key: string, value: string) => Promise<void>;
+  // User Accounts
+  users: SystemUser[];
+  onAddUser: (user: SystemUser) => Promise<void>;
+  onDeleteUser: (username: string) => Promise<void>;
 }
 
 export default function AdminView({
@@ -22,9 +29,14 @@ export default function AdminView({
   onDeleteMember,
   onAddAnnouncement,
   onDeleteAnnouncement,
+  settings,
+  onSaveSetting,
+  users,
+  onAddUser,
+  onDeleteUser,
 }: AdminViewProps) {
   // Views switching inside Admin panel
-  const [adminTab, setAdminTab] = useState<'members' | 'announcements' | 'logs'>('members');
+  const [adminTab, setAdminTab] = useState<'members' | 'announcements' | 'logs' | 'settings' | 'users'>('members');
 
   // Modal and form states for Member
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
@@ -51,6 +63,30 @@ export default function AdminView({
   const [annTitle, setAnnTitle] = useState('');
   const [annContent, setAnnContent] = useState('');
   const [annType, setAnnType] = useState<'urgent' | 'update' | 'event'>('update');
+
+  // Local states for custom settings inputs
+  const [settingsHeroTitle, setSettingsHeroTitle] = useState(settings.heroTitle || 'Gia Phả Gia Đình');
+  const [settingsHeroSubtitle, setSettingsHeroSubtitle] = useState(settings.heroSubtitle || 'Cụ Nghiêm Cung');
+  const [settingsHeroImage, setSettingsHeroImage] = useState(settings.heroImage || 'https://images.unsplash.com/photo-1605369572399-05d8d64a0f6e?q=80&w=2000&auto=format&fit=crop');
+  const [settingsIntroText1, setSettingsIntroText1] = useState(settings.introText1 || 'Cây có gốc mới nở cành xanh ngọn, nước có nguồn mới bể rộng sông sâu. Người có tổ tông mới sinh con cháu, hiếu nghĩa vẹn tròn mới rạng rỡ tổ tiên.');
+  const [settingsIntroText2, setSettingsIntroText2] = useState(settings.introText2 || 'Gia phả gia đình dòng họ Cụ Nghiêm Cung (kế thừa dòng dõi cụ cố Nghiêm Điều (Chu) tại vùng đất Hòa Xá cổ kính, giàu truyền thống cách mạng) được lập ra nhằm mục đích kính cáo tổ tông, ghi chép tường tận huyết mạch dòng giống, lưu truyền cho con cháu vạn đời sau không bao giờ quên đi nguồn cội thiêng liêng của mình.');
+  const [settingsIntroText3, setSettingsIntroText3] = useState(settings.introText3 || 'Trải qua bao thăng trầm của lịch sử, con cháu họ Nghiêm luôn gìn giữ nếp gia phong nghiêm cẩn, lấy hiếu học làm đầu, lấy đức độ làm trọng, lấy trung thực làm gương và hết lòng đùm bọc, giúp đỡ lẫn nhau vượt qua gian khó, lập thân kiến nghiệp làm rạng danh gia đình.');
+
+  // Local states for custom user provisioning
+  const [newUsername, setNewUsername] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [newFullName, setNewFullName] = useState('');
+  const [newUserRole, setNewUserRole] = useState<'admin' | 'user'>('admin');
+
+  // Synchronize dynamic settings once loaded
+  React.useEffect(() => {
+    if (settings.heroTitle) setSettingsHeroTitle(settings.heroTitle);
+    if (settings.heroSubtitle) setSettingsHeroSubtitle(settings.heroSubtitle);
+    if (settings.heroImage) setSettingsHeroImage(settings.heroImage);
+    if (settings.introText1) setSettingsIntroText1(settings.introText1);
+    if (settings.introText2) setSettingsIntroText2(settings.introText2);
+    if (settings.introText3) setSettingsIntroText3(settings.introText3);
+  }, [settings]);
 
   // Open modal to add a new member
   const handleOpenAddMember = () => {
@@ -152,6 +188,44 @@ export default function AdminView({
     alert('Đăng thông báo dòng họ thành công!');
   };
 
+  const handleSaveBannerSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await onSaveSetting('heroTitle', settingsHeroTitle);
+      await onSaveSetting('heroSubtitle', settingsHeroSubtitle);
+      await onSaveSetting('heroImage', settingsHeroImage);
+      await onSaveSetting('introText1', settingsIntroText1);
+      await onSaveSetting('introText2', settingsIntroText2);
+      await onSaveSetting('introText3', settingsIntroText3);
+      alert('Đã cập nhật cấu hình Banner và thông tin giới thiệu Gia tộc thành công!');
+    } catch (err) {
+      alert('Đã xảy ra lỗi khi lưu cấu hình.');
+    }
+  };
+
+  const handleCreateUserSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUsername.trim() || !newPassword.trim() || !newFullName.trim()) {
+      alert('Vui lòng điền đầy đủ tài khoản, mật khẩu và tên hiển thị.');
+      return;
+    }
+    const payload: SystemUser = {
+      username: newUsername.trim().toLowerCase(),
+      password: newPassword.trim(),
+      fullName: newFullName.trim(),
+      role: newUserRole
+    };
+    try {
+      await onAddUser(payload);
+      setNewUsername('');
+      setNewPassword('');
+      setNewFullName('');
+      alert(`Đã cấp tài khoản quản trị thành công cho: ${payload.username}`);
+    } catch (err) {
+      alert('Không thể tạo tài khoản lúc này.');
+    }
+  };
+
   return (
     <div className="w-full max-w-7xl mx-auto py-8 px-4 flex flex-col gap-6">
       <div className="bg-white rounded-xl shadow-xs border border-[#eadecb] p-6">
@@ -194,6 +268,28 @@ export default function AdminView({
           >
             <Activity className="w-4 h-4" />
             Nhật ký sửa đổi ({logs.length})
+          </button>
+          <button
+            onClick={() => setAdminTab('settings')}
+            className={`px-4 py-2.5 font-bold text-xs uppercase tracking-wider border-b-2 flex items-center gap-1.5 transition ${
+              adminTab === 'settings'
+                ? 'border-[#b8956b] text-[#6b4724]'
+                : 'border-transparent text-gray-400 hover:text-gray-600'
+            }`}
+          >
+            <Image className="w-4 h-4" />
+            Cấu hình Banner & Gia Tộc
+          </button>
+          <button
+            onClick={() => setAdminTab('users')}
+            className={`px-4 py-2.5 font-bold text-xs uppercase tracking-wider border-b-2 flex items-center gap-1.5 transition ${
+              adminTab === 'users'
+                ? 'border-[#b8956b] text-[#6b4724]'
+                : 'border-transparent text-gray-400 hover:text-gray-600'
+            }`}
+          >
+            <Key className="w-4 h-4" />
+            Cấp Tài Khoản ({users.length + 1})
           </button>
         </div>
 
@@ -339,6 +435,242 @@ export default function AdminView({
                   <span className="text-gray-400 flex-shrink-0 font-medium">{log.timestamp}</span>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* 4. HERO BANNER & GIA TỘC CONFIGURATION */}
+        {adminTab === 'settings' && (
+          <form onSubmit={handleSaveBannerSettings} className="space-y-5 text-xs text-[#4a331a]">
+            <div className="bg-[#fdfbf7] p-4 rounded-xl border border-[#eadecb] space-y-4">
+              <h3 className="text-sm font-bold text-[#6b4724] font-serif uppercase tracking-wider flex items-center gap-1.5 border-b border-[#eadecb] pb-2">
+                <Image className="w-4 h-4 text-[#b8956b]" />
+                Cấu hình Hero Banner & Tiêu đề trang chủ
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-bold text-[#6b4724] mb-1">Tiêu đề Banner chính (Chữ lớn):</label>
+                  <input
+                    type="text"
+                    required
+                    value={settingsHeroTitle}
+                    onChange={(e) => setSettingsHeroTitle(e.target.value)}
+                    className="w-full p-2.5 border border-[#d6b583] rounded bg-white font-medium focus:ring-1 focus:ring-[#b8956b] focus:outline-none"
+                    placeholder="Ví dụ: Gia Phả Gia Đình"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-[#6b4724] mb-1">Tiêu đề phụ Banner (Chữ vàng):</label>
+                  <input
+                    type="text"
+                    required
+                    value={settingsHeroSubtitle}
+                    onChange={(e) => setSettingsHeroSubtitle(e.target.value)}
+                    className="w-full p-2.5 border border-[#d6b583] rounded bg-white font-medium focus:ring-1 focus:ring-[#b8956b] focus:outline-none"
+                    placeholder="Ví dụ: Cụ Nghiêm Cung"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block font-bold text-[#6b4724] mb-1">Đường dẫn ảnh nền Banner (URL Ảnh):</label>
+                  <input
+                    type="text"
+                    required
+                    value={settingsHeroImage}
+                    onChange={(e) => setSettingsHeroImage(e.target.value)}
+                    className="w-full p-2.5 border border-[#d6b583] rounded bg-white font-mono focus:ring-1 focus:ring-[#b8956b] focus:outline-none"
+                    placeholder="Nhập link hình ảnh Unsplash hoặc CDN bất kỳ..."
+                  />
+                  <div className="mt-2 text-[10px] text-gray-400">
+                    Mẹo: Bạn có thể nhập bất kỳ địa chỉ ảnh trực tuyến nào để thay đổi diện mạo trang trọng cho Header dòng tộc.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-[#fdfbf7] p-4 rounded-xl border border-[#eadecb] space-y-4">
+              <h3 className="text-sm font-bold text-[#6b4724] font-serif uppercase tracking-wider flex items-center gap-1.5 border-b border-[#eadecb] pb-2">
+                <Settings className="w-4 h-4 text-[#b8956b]" />
+                Cấu hình Lời tựa giới thiệu Gia tộc
+              </h3>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block font-bold text-[#6b4724] mb-1">Đoạn giới thiệu 1 (Mở đầu văn hoa):</label>
+                  <textarea
+                    rows={2}
+                    value={settingsIntroText1}
+                    onChange={(e) => setSettingsIntroText1(e.target.value)}
+                    className="w-full p-2.5 border border-[#d6b583] rounded bg-white font-medium focus:ring-1 focus:ring-[#b8956b] focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-[#6b4724] mb-1">Đoạn giới thiệu 2 (Chi tiết chi nhánh, quê hương):</label>
+                  <textarea
+                    rows={3}
+                    value={settingsIntroText2}
+                    onChange={(e) => setSettingsIntroText2(e.target.value)}
+                    className="w-full p-2.5 border border-[#d6b583] rounded bg-white font-medium focus:ring-1 focus:ring-[#b8956b] focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-[#6b4724] mb-1">Đoạn giới thiệu 3 (Tuyên ngôn truyền thống):</label>
+                  <textarea
+                    rows={3}
+                    value={settingsIntroText3}
+                    onChange={(e) => setSettingsIntroText3(e.target.value)}
+                    className="w-full p-2.5 border border-[#d6b583] rounded bg-white font-medium focus:ring-1 focus:ring-[#b8956b] focus:outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                className="px-6 py-2.5 bg-[#6b4724] text-white hover:bg-[#4a3219] font-bold rounded-lg transition shadow flex items-center gap-1"
+              >
+                <Save className="w-4 h-4" />
+                Lưu Thay Đổi Cấu Hình
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* 5. USER ACCOUNTS PROVISIONING */}
+        {adminTab === 'users' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 text-xs text-[#4a331a]">
+            
+            {/* Create new account form */}
+            <form onSubmit={handleCreateUserSubmit} className="lg:col-span-1 bg-[#fdfbf7] p-5 rounded-xl border border-[#eadecb] space-y-4 h-fit">
+              <h3 className="text-sm font-bold text-[#6b4724] font-serif uppercase tracking-wider flex items-center gap-1.5 border-b border-[#eadecb] pb-2">
+                <Key className="w-4 h-4 text-[#b8956b]" />
+                Cấp Tài Khoản Mới
+              </h3>
+
+              <div>
+                <label className="block font-bold text-[#6b4724] mb-1">Tên tài khoản đăng nhập (*):</label>
+                <input
+                  type="text"
+                  required
+                  value={newUsername}
+                  onChange={(e) => setNewUsername(e.target.value)}
+                  className="w-full p-2 border border-[#d6b583] rounded bg-white focus:outline-none"
+                  placeholder="Ví dụ: nghiemtuan"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-[#6b4724] mb-1">Mật khẩu truy cập (*):</label>
+                <input
+                  type="password"
+                  required
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full p-2 border border-[#d6b583] rounded bg-white focus:outline-none"
+                  placeholder="Nhập mật khẩu an toàn..."
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-[#6b4724] mb-1">Tên hiển thị đầy đủ (*):</label>
+                <input
+                  type="text"
+                  required
+                  value={newFullName}
+                  onChange={(e) => setNewFullName(e.target.value)}
+                  className="w-full p-2 border border-[#d6b583] rounded bg-white focus:outline-none"
+                  placeholder="Ví dụ: Nghiêm Văn Tuấn"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-[#6b4724] mb-1">Vai trò hệ thống:</label>
+                <select
+                  value={newUserRole}
+                  onChange={(e) => setNewUserRole(e.target.value as 'admin' | 'user')}
+                  className="w-full p-2 border border-[#d6b583] rounded bg-white focus:outline-none"
+                >
+                  <option value="admin">Quản trị viên (Toàn quyền)</option>
+                  <option value="user">Thành viên dòng họ (Chỉ xem và khấn nguyện)</option>
+                </select>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-2 bg-[#b8956b] hover:bg-[#8b7355] text-white font-bold rounded transition flex items-center justify-center gap-1.5"
+              >
+                <Plus className="w-4 h-4" />
+                Cấp Tài Khoản
+              </button>
+            </form>
+
+            {/* Existing system users table */}
+            <div className="lg:col-span-2 space-y-4">
+              <div className="bg-[#fdfbf7] p-3 rounded-lg border border-[#f4f0e6] font-semibold text-gray-500">
+                Danh sách các tài khoản quản lý hệ thống đã cấp phát:
+              </div>
+
+              <div className="overflow-x-auto border border-[#eadecb] rounded-xl bg-white">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-[#f4f0e6] text-[#6b4724] font-bold border-b border-[#eadecb]">
+                      <th className="p-3">Tài khoản</th>
+                      <th className="p-3">Họ và Tên hiển thị</th>
+                      <th className="p-3">Mật khẩu bảo mật</th>
+                      <th className="p-3">Quyền hạn</th>
+                      <th className="p-3 text-right">Tùy chọn</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#f4f0e6] text-gray-700">
+                    {/* Default admin is hardcoded and protected */}
+                    <tr>
+                      <td className="p-3 font-bold text-[#6b4724]">admin</td>
+                      <td className="p-3 font-medium text-gray-600">Quản Trị Viên Chi Trưởng</td>
+                      <td className="p-3 font-mono text-gray-400">•••••••• (Mặc định)</td>
+                      <td className="p-3">
+                        <span className="px-2 py-0.5 bg-red-50 text-red-600 font-bold border border-red-200 rounded text-[9px] uppercase">
+                          Hệ Thống
+                        </span>
+                      </td>
+                      <td className="p-3 text-right text-gray-400 font-semibold italic text-[10px]">Không thể xóa</td>
+                    </tr>
+
+                    {users.map((u) => (
+                      <tr key={u.username} className="hover:bg-gray-50 transition">
+                        <td className="p-3 font-bold text-[#6b4724]">{u.username}</td>
+                        <td className="p-3 font-medium text-gray-600">{u.fullName}</td>
+                        <td className="p-3 font-mono text-gray-500">{u.password || '••••••••'}</td>
+                        <td className="p-3">
+                          <span className={`px-2 py-0.5 rounded font-bold border text-[9px] uppercase ${
+                            u.role === 'admin'
+                              ? 'bg-rose-50 text-rose-600 border-rose-200'
+                              : 'bg-indigo-50 text-indigo-600 border-indigo-200'
+                          }`}>
+                            {u.role === 'admin' ? 'Quản trị viên' : 'Thành viên'}
+                          </span>
+                        </td>
+                        <td className="p-3 text-right">
+                          <button
+                            onClick={() => {
+                              if (confirm(`Bạn có chắc chắn muốn thu hồi tài khoản quản trị "${u.username}"?`)) {
+                                onDeleteUser(u.username);
+                              }
+                            }}
+                            className="p-1 px-2 bg-red-50 text-red-600 rounded border border-red-200 hover:bg-red-100 transition text-[10px] font-bold"
+                          >
+                            Thu hồi
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}

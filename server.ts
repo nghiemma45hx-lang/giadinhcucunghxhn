@@ -103,7 +103,7 @@ app.get("/api/members", async (req, res) => {
       .order("generation", { ascending: true });
 
     if (error) {
-      console.warn("family_members database query error (falling back to local):", error.message || error);
+      console.log("family_members database query status:", error.message || error);
       return res.json({ tablesNeedInitialization: true, data: [] });
     }
 
@@ -111,7 +111,17 @@ app.get("/api/members", async (req, res) => {
       console.log("family_members table is empty, auto-seeding default data...");
       const { error: insertError } = await supabase.from("family_members").insert(initialMembers);
       if (insertError) {
-        console.warn("Failed to seed family_members (using initial fallback):", insertError.message || insertError);
+        if (insertError.message && (insertError.message.includes("spouseIds") || insertError.message.includes("column"))) {
+          console.log("Missing spouseIds column detected in DB. Seeding cleaned version instead...");
+          const cleanedMembers = initialMembers.map(({ spouseIds, ...rest }) => rest);
+          const { error: retryError } = await supabase.from("family_members").insert(cleanedMembers);
+          if (retryError) {
+            console.log("Failed to seed family_members even without spouseIds:", retryError.message || retryError);
+            return res.json({ tablesNeedInitialization: true, data: [] });
+          }
+          return res.json({ data: cleanedMembers });
+        }
+        console.log("Failed to seed family_members (using initial fallback):", insertError.message || insertError);
         return res.json({ tablesNeedInitialization: true, data: [] });
       }
       return res.json({ data: initialMembers });
@@ -128,8 +138,18 @@ app.post("/api/members", async (req, res) => {
   try {
     const supabase = getSupabaseClient();
     const member = req.body;
-    const { data, error } = await supabase.from("family_members").insert([member]).select();
-    if (error) throw error;
+    let { data, error } = await supabase.from("family_members").insert([member]).select();
+    if (error) {
+      if (error.message && (error.message.includes("spouseIds") || error.message.includes("column"))) {
+        console.warn("POST /api/members failed with spouseIds column error. Retrying without 'spouseIds'.");
+        const { spouseIds, ...cleanedMember } = member;
+        const retryResult = await supabase.from("family_members").insert([cleanedMember]).select();
+        if (retryResult.error) throw retryResult.error;
+        data = retryResult.data;
+      } else {
+        throw error;
+      }
+    }
     return res.json({ success: true, data: data?.[0] || member });
   } catch (error: any) {
     console.error("POST /api/members error:", error);
@@ -142,8 +162,18 @@ app.put("/api/members/:id", async (req, res) => {
     const supabase = getSupabaseClient();
     const { id } = req.params;
     const member = req.body;
-    const { error } = await supabase.from("family_members").update(member).eq("id", id);
-    if (error) throw error;
+    let { error } = await supabase.from("family_members").update(member).eq("id", id);
+    if (error) {
+      if (error.message && (error.message.includes("spouseIds") || error.message.includes("column"))) {
+        console.warn("PUT /api/members failed with spouseIds column error. Retrying without 'spouseIds'.");
+        const { spouseIds, ...cleanedMember } = member;
+        const retryResult = await supabase.from("family_members").update(cleanedMember).eq("id", id);
+        if (retryResult.error) throw retryResult.error;
+        error = null;
+      } else {
+        throw error;
+      }
+    }
     return res.json({ success: true });
   } catch (error: any) {
     console.error("PUT /api/members error:", error);
@@ -174,7 +204,7 @@ app.get("/api/announcements", async (req, res) => {
       .order("date", { ascending: false });
 
     if (error) {
-      console.warn("announcements database query error (falling back to local):", error.message || error);
+      console.log("announcements database query info:", error.message || error);
       return res.json({ tablesNeedInitialization: true, data: [] });
     }
 
@@ -182,7 +212,7 @@ app.get("/api/announcements", async (req, res) => {
       console.log("announcements table is empty, auto-seeding default data...");
       const { error: insertError } = await supabase.from("announcements").insert(initialAnnouncements);
       if (insertError) {
-        console.warn("Failed to seed announcements (using initial fallback):", insertError.message || insertError);
+        console.log("Seeding announcements status:", insertError.message || insertError);
         return res.json({ tablesNeedInitialization: true, data: [] });
       }
       return res.json({ data: initialAnnouncements });
@@ -231,7 +261,7 @@ app.get("/api/prayers", async (req, res) => {
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.warn("prayers database query error (falling back to local):", error.message || error);
+      console.log("prayers database query status:", error.message || error);
       return res.json({ tablesNeedInitialization: true, data: [] });
     }
 
@@ -265,7 +295,7 @@ app.get("/api/logs", async (req, res) => {
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.warn("system_logs database query error (falling back to local):", error.message || error);
+      console.log("system_logs database query status:", error.message || error);
       return res.json({ tablesNeedInitialization: true, data: [] });
     }
 
@@ -285,6 +315,77 @@ app.post("/api/logs", async (req, res) => {
     return res.json({ success: true });
   } catch (error: any) {
     console.error("POST /api/logs error:", error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// 5. System Users Endpoints
+app.get("/api/users", async (req, res) => {
+  try {
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase.from("system_users").select("*");
+    if (error) {
+      console.log("system_users table query status:", error.message || error);
+      return res.json({ tablesNeedInitialization: true, data: [] });
+    }
+    return res.json({ data: data || [] });
+  } catch (error: any) {
+    console.error("GET /api/users error:", error?.message || error);
+    return res.json({ data: [] });
+  }
+});
+
+app.post("/api/users", async (req, res) => {
+  try {
+    const supabase = getSupabaseClient();
+    const user = req.body;
+    const { error } = await supabase.from("system_users").upsert([user]);
+    if (error) throw error;
+    return res.json({ success: true });
+  } catch (error: any) {
+    console.error("POST /api/users error:", error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete("/api/users/:username", async (req, res) => {
+  try {
+    const supabase = getSupabaseClient();
+    const { username } = req.params;
+    const { error } = await supabase.from("system_users").delete().eq("username", username);
+    if (error) throw error;
+    return res.json({ success: true });
+  } catch (error: any) {
+    console.error("DELETE /api/users error:", error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// 6. System Settings Endpoints
+app.get("/api/settings", async (req, res) => {
+  try {
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase.from("system_settings").select("*");
+    if (error) {
+      console.log("system_settings table query status:", error.message || error);
+      return res.json({ tablesNeedInitialization: true, data: [] });
+    }
+    return res.json({ data: data || [] });
+  } catch (error: any) {
+    console.error("GET /api/settings error:", error?.message || error);
+    return res.json({ data: [] });
+  }
+});
+
+app.post("/api/settings", async (req, res) => {
+  try {
+    const supabase = getSupabaseClient();
+    const setting = req.body;
+    const { error } = await supabase.from("system_settings").upsert([setting]);
+    if (error) throw error;
+    return res.json({ success: true });
+  } catch (error: any) {
+    console.error("POST /api/settings error:", error);
     return res.status(500).json({ error: error.message });
   }
 });

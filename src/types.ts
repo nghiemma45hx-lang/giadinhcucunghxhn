@@ -39,3 +39,15 @@ export interface SystemLog {
   user: string;
   timestamp: string;
 }
+
+export interface SystemUser {
+  username: string;
+  fullName: string;
+  role: 'admin' | 'user';
+  password?: string;
+}
+
+export interface SystemSetting {
+  key: string;
+  value: string;
+}

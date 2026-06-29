@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { TreeDeciduous, LogIn, LogOut, Shield, Heart, Users, BookOpen, BarChart3, HelpCircle, Star } from 'lucide-react';
-import { FamilyMember, Announcement, AltarPrayer, SystemLog } from './types';
+import { FamilyMember, Announcement, AltarPrayer, SystemLog, SystemUser } from './types';
 import { initialMembers, initialAnnouncements } from './data/familyData';
 
 // Import sub-views
 import HomeView from './components/HomeView';
 import TreeView from './components/TreeView';
 import MemberListView from './components/MemberListView';
+import MemberTableView from './components/MemberTableView';
 import MemorialView from './components/MemorialView';
 import StatisticsView from './components/StatisticsView';
 import AdminView from './components/AdminView';
@@ -22,6 +23,19 @@ export default function App() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [prayers, setPrayers] = useState<AltarPrayer[]>([]);
   const [logs, setLogs] = useState<SystemLog[]>([]);
+
+  // System Settings State
+  const [settings, setSettings] = useState<Record<string, string>>({
+    heroTitle: localStorage.getItem('heroTitle') || "Gia Phả Gia Đình",
+    heroSubtitle: localStorage.getItem('heroSubtitle') || "Cụ Nghiêm Cung",
+    heroImage: localStorage.getItem('heroImage') || "https://images.unsplash.com/photo-1605369572399-05d8d64a0f6e?q=80&w=2000&auto=format&fit=crop",
+    introText1: localStorage.getItem('introText1') || "Cây có gốc mới nở cành xanh ngọn, nước có nguồn mới bể rộng sông sâu. Người có tổ tông mới sinh con cháu, hiếu nghĩa vẹn tròn mới rạng rỡ tổ tiên.",
+    introText2: localStorage.getItem('introText2') || "Gia phả gia đình dòng họ Cụ Nghiêm Cung (kế thừa dòng dõi cụ cố Nghiêm Điều (Chu) tại vùng đất Hòa Xá cổ kính, giàu truyền thống cách mạng) được lập ra nhằm mục đích kính cáo tổ tông, ghi chép tường tận huyết mạch dòng giống, lưu truyền cho con cháu vạn đời sau không bao giờ quên đi nguồn cội thiêng liêng của mình.",
+    introText3: localStorage.getItem('introText3') || "Trải qua bao thăng trầm của lịch sử, con cháu họ Nghiêm luôn gìn giữ nếp gia phong nghiêm cẩn, lấy hiếu học làm đầu, lấy đức độ làm trọng, lấy trung thực làm gương và hết lòng đùm bọc, giúp đỡ lẫn nhau vượt qua gian khó, lập thân kiến nghiệp làm rạng danh gia đình."
+  });
+
+  // Custom User Accounts
+  const [users, setUsers] = useState<SystemUser[]>([]);
 
   // Auth States
   const [currentUser, setCurrentUser] = useState<{ username: string; fullName: string; role: string } | null>(null);
@@ -83,6 +97,37 @@ export default function App() {
             localStorage.setItem('gia_pha_logs', JSON.stringify(json.data));
           }
         }
+
+        // Fetch settings from database
+        try {
+          const resSettings = await fetch('/api/settings');
+          if (resSettings.ok) {
+            const json = await resSettings.json();
+            if (json.data && json.data.length > 0) {
+              const loaded: Record<string, string> = {};
+              json.data.forEach((s: any) => {
+                loaded[s.key] = s.value;
+              });
+              setSettings(prev => ({ ...prev, ...loaded }));
+            }
+          }
+        } catch (err) {
+          console.warn("Database query failed for settings, falling back.");
+        }
+
+        // Fetch custom users from database
+        try {
+          const resUsers = await fetch('/api/users');
+          if (resUsers.ok) {
+            const json = await resUsers.json();
+            if (json.data) {
+              setUsers(json.data);
+              localStorage.setItem('gia_pha_users', JSON.stringify(json.data));
+            }
+          }
+        } catch (err) {
+          console.warn("Database query failed for users, falling back.");
+        }
       } catch (e) {
         console.warn("Backend API not reachable or error. Falling back to local storage.", e);
         
@@ -125,6 +170,23 @@ export default function App() {
             { id: 'l-1', action: 'khởi tạo cơ sở dữ liệu gia phả ban đầu', user: 'Hệ thống', timestamp: '2026-06-28 21:50' }
           ];
           setLogs(initialLogs);
+        }
+
+        // Local settings fallbacks
+        const storedKeys = ['heroTitle', 'heroSubtitle', 'heroImage', 'introText1', 'introText2', 'introText3'];
+        const loaded: Record<string, string> = {};
+        storedKeys.forEach(k => {
+          const val = localStorage.getItem(k);
+          if (val) loaded[k] = val;
+        });
+        if (Object.keys(loaded).length > 0) {
+          setSettings(prev => ({ ...prev, ...loaded }));
+        }
+
+        // Local users fallbacks
+        const storedUsers = localStorage.getItem('gia_pha_users');
+        if (storedUsers) {
+          setUsers(JSON.parse(storedUsers));
         }
       }
 
@@ -184,6 +246,8 @@ export default function App() {
     e.preventDefault();
     setLoginError('');
 
+    const customUser = users.find(u => u.username === username.trim().toLowerCase() && u.password === password);
+
     // Specific instruction rule: admin/admin login explicitly
     if (username === 'admin' && password === 'admin') {
       const user = { username: 'admin', fullName: 'Quản Trị Viên Chi Trưởng', role: 'admin' };
@@ -193,6 +257,14 @@ export default function App() {
       setUsername('');
       setPassword('');
       addLog('đăng nhập vào hệ thống quản trị', 'admin');
+    } else if (customUser) {
+      const user = { username: customUser.username, fullName: customUser.fullName, role: customUser.role };
+      setCurrentUser(user);
+      localStorage.setItem('gia_pha_user', JSON.stringify(user));
+      setIsLoginModalOpen(false);
+      setUsername('');
+      setPassword('');
+      addLog('đăng nhập vào hệ thống quản trị', customUser.fullName);
     } else {
       setLoginError('Sai tài khoản đăng nhập hoặc mật khẩu quản trị!');
     }
@@ -204,6 +276,59 @@ export default function App() {
     localStorage.removeItem('gia_pha_user');
     if (currentTab === 'admin') {
       setCurrentTab('home');
+    }
+  };
+
+  // Systems Configuration Handlers
+  const handleSaveSetting = async (key: string, value: string) => {
+    setSettings(prev => {
+      const next = { ...prev, [key]: value };
+      localStorage.setItem(key, value);
+      return next;
+    });
+    try {
+      await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, value })
+      });
+      addLog(`cập nhật cấu hình: ${key}`, currentUser?.fullName || 'admin');
+    } catch (err) {
+      console.error("Failed to save setting to database:", err);
+    }
+  };
+
+  const handleAddUser = async (user: SystemUser) => {
+    setUsers(prev => {
+      const next = [user, ...prev.filter(u => u.username !== user.username)];
+      localStorage.setItem('gia_pha_users', JSON.stringify(next));
+      return next;
+    });
+    try {
+      await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(user)
+      });
+      addLog(`cấp tài khoản quản lý mới: ${user.username}`, currentUser?.fullName || 'admin');
+    } catch (err) {
+      console.error("Failed to add custom user to database:", err);
+    }
+  };
+
+  const handleDeleteUser = async (username: string) => {
+    setUsers(prev => {
+      const next = prev.filter(u => u.username !== username);
+      localStorage.setItem('gia_pha_users', JSON.stringify(next));
+      return next;
+    });
+    try {
+      await fetch(`/api/users/${username}`, {
+        method: 'DELETE'
+      });
+      addLog(`thu hồi tài khoản quản trị: ${username}`, currentUser?.fullName || 'admin');
+    } catch (err) {
+      console.error("Failed to delete custom user from database:", err);
     }
   };
 
@@ -354,7 +479,7 @@ export default function App() {
       <header className="relative bg-[#3e2a16] h-[220px] md:h-[280px] flex items-center justify-center overflow-hidden">
         <div 
           className="absolute inset-0 opacity-25 bg-center bg-cover" 
-          style={{ backgroundImage: "url('https://images.unsplash.com/photo-1605369572399-05d8d64a0f6e?q=80&w=2000&auto=format&fit=crop')" }}
+          style={{ backgroundImage: `url('${settings.heroImage}')` }}
         ></div>
         <div className="absolute inset-0 bg-gradient-to-t from-[#2a1d0f] to-transparent"></div>
         
@@ -365,10 +490,10 @@ export default function App() {
             <div className="h-[1.5px] w-12 md:w-20 bg-[#d6b583]"></div>
           </div>
           <h1 className="text-2xl md:text-5xl font-extrabold text-[#fdfbf7] uppercase tracking-widest font-serif drop-shadow-md mb-2">
-            Gia Phả Gia Đình
+            {settings.heroTitle}
           </h1>
           <h2 className="text-xl md:text-3.5xl font-extrabold text-[#d6b583] uppercase tracking-widest font-serif drop-shadow-sm">
-            Cụ Nghiêm Cung
+            {settings.heroSubtitle}
           </h2>
         </div>
       </header>
@@ -403,6 +528,16 @@ export default function App() {
                 }`}
               >
                 Cây gia phả
+              </button>
+              <button
+                onClick={() => setCurrentTab('member-table')}
+                className={`px-3 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1 shrink-0 ${
+                  currentTab === 'member-table'
+                    ? 'bg-[#4a3219] text-[#eadecb] border-b-2 border-[#d6b583]'
+                    : 'hover:bg-[#4a3219] hover:text-white text-gray-200'
+                }`}
+              >
+                Danh sách
               </button>
               <button
                 onClick={() => setCurrentTab('member-list')}
@@ -527,10 +662,13 @@ export default function App() {
                 onPrint={handlePrint}
                 onExportWord={handleExportWord}
                 onExportPdf={handleExportPdf}
+                settings={settings}
               />
             )}
 
             {currentTab === 'family-tree' && <TreeView members={members} />}
+
+            {currentTab === 'member-table' && <MemberTableView members={members} />}
 
             {currentTab === 'member-list' && <MemberListView members={members} />}
 
@@ -550,6 +688,11 @@ export default function App() {
                 onDeleteMember={handleDeleteMember}
                 onAddAnnouncement={handleAddAnnouncement}
                 onDeleteAnnouncement={handleDeleteAnnouncement}
+                settings={settings}
+                onSaveSetting={handleSaveSetting}
+                users={users}
+                onAddUser={handleAddUser}
+                onDeleteUser={handleDeleteUser}
               />
             )}
           </motion.div>
@@ -559,12 +702,12 @@ export default function App() {
       {/* 5. ELEVATED FOOTER */}
       <footer className="bg-[#3e2a16] text-[#eadecb] py-8 border-t-4 border-[#b8956b] mt-auto">
         <div className="max-w-7xl mx-auto px-4 text-center space-y-3">
-          <h4 className="font-serif font-extrabold text-lg text-[#fdfbf7]">Gia Phả Gia Đình Cụ Nghiêm Cung</h4>
+          <h4 className="font-serif font-extrabold text-lg text-[#fdfbf7]">{settings.heroTitle} {settings.heroSubtitle}</h4>
           <p className="text-xs opacity-75 max-w-md mx-auto">
             Hệ thống kỹ thuật số bảo tồn phả hệ họ Nghiêm Việt Nam. Kế thừa tổ tông, khai sơn lập họ, bảo tồn truyền thống huyết thống thiêng liêng.
           </p>
           <div className="text-[10px] opacity-60">
-            &copy; 2026 Gia tộc Cụ Nghiêm Cung. Tất cả quyền được bảo lưu. Quê quán: Xã Hòa Xá, Thành phố Hà Nội.
+            &copy; 2026 Gia tộc {settings.heroSubtitle}. Tất cả quyền được bảo lưu. Quê quán: Xã Hòa Xá, Thành phố Hà Nội.
           </div>
         </div>
       </footer>
@@ -671,6 +814,7 @@ CREATE TABLE IF NOT EXISTS family_members (
   "isDeceased" BOOLEAN NOT NULL DEFAULT false,
   "parentId" TEXT,
   "spouseId" TEXT,
+  "spouseIds" TEXT[],
   branch TEXT NOT NULL,
   story TEXT,
   occupation TEXT,
@@ -678,6 +822,9 @@ CREATE TABLE IF NOT EXISTS family_members (
   phone TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+-- Thêm cột "spouseIds" vào bảng family_members nếu đã tạo trước đó
+ALTER TABLE family_members ADD COLUMN IF NOT EXISTS "spouseIds" TEXT[];
 
 -- 2. Tạo bảng announcements
 CREATE TABLE IF NOT EXISTS announcements (
@@ -705,6 +852,22 @@ CREATE TABLE IF NOT EXISTS system_logs (
   action TEXT NOT NULL,
   "user" TEXT NOT NULL,
   timestamp TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 5. Tạo bảng system_users
+CREATE TABLE IF NOT EXISTS system_users (
+  username TEXT PRIMARY KEY,
+  "fullName" TEXT NOT NULL,
+  role TEXT NOT NULL,
+  password TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 6. Tạo bảng system_settings
+CREATE TABLE IF NOT EXISTS system_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );`}
                 </pre>
@@ -722,6 +885,7 @@ CREATE TABLE IF NOT EXISTS family_members (
   "isDeceased" BOOLEAN NOT NULL DEFAULT false,
   "parentId" TEXT,
   "spouseId" TEXT,
+  "spouseIds" TEXT[],
   branch TEXT NOT NULL,
   story TEXT,
   occupation TEXT,
@@ -729,6 +893,9 @@ CREATE TABLE IF NOT EXISTS family_members (
   phone TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+-- Thêm cột "spouseIds" vào bảng family_members nếu đã tạo trước đó
+ALTER TABLE family_members ADD COLUMN IF NOT EXISTS "spouseIds" TEXT[];
 
 -- 2. Tạo bảng announcements
 CREATE TABLE IF NOT EXISTS announcements (
@@ -756,6 +923,22 @@ CREATE TABLE IF NOT EXISTS system_logs (
   action TEXT NOT NULL,
   "user" TEXT NOT NULL,
   timestamp TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 5. Tạo bảng system_users
+CREATE TABLE IF NOT EXISTS system_users (
+  username TEXT PRIMARY KEY,
+  "fullName" TEXT NOT NULL,
+  role TEXT NOT NULL,
+  password TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 6. Tạo bảng system_settings
+CREATE TABLE IF NOT EXISTS system_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );`);
                     alert('Đã sao chép đoạn mã SQL vào bộ nhớ đệm!');
