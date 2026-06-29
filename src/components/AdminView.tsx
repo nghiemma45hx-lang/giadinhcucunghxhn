@@ -933,27 +933,55 @@ export default function AdminView({
 
                 {/* Birth Year */}
                 <div>
-                  <label className="block font-bold text-[#6b4724] mb-1">Năm sinh:</label>
-                  <input
-                    type="text"
-                    value={birthYear}
-                    onChange={(e) => setBirthYear(e.target.value)}
-                    className="w-full p-2 border border-[#d6b583] rounded bg-[#fdfbf7]"
-                    placeholder="Ví dụ: 1949"
-                  />
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="block font-bold text-[#6b4724]">Năm sinh:</label>
+                    {birthYear && getCanChi(birthYear) && (
+                      <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded font-bold">
+                        Âm lịch: {getCanChi(birthYear)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={birthYear}
+                      onChange={(e) => setBirthYear(e.target.value)}
+                      className="w-full p-2 border border-[#d6b583] rounded bg-[#fdfbf7] pr-20"
+                      placeholder="Ví dụ: 1949"
+                    />
+                    {!isDeceased && birthYear && !isNaN(parseYearStr(birthYear)) && (
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
+                        {2026 - parseYearStr(birthYear)} tuổi (2026)
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Death Year */}
                 {isDeceased && (
                   <div>
-                    <label className="block font-bold text-red-600 mb-1">Năm tạ thế †:</label>
-                    <input
-                      type="text"
-                      value={deathYear}
-                      onChange={(e) => setDeathYear(e.target.value)}
-                      className="w-full p-2 border border-red-300 rounded bg-red-50/50"
-                      placeholder="Ví dụ: 2012"
-                    />
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="block font-bold text-red-600">Năm tạ thế †:</label>
+                      {deathYear && getCanChi(deathYear) && (
+                        <span className="text-xs text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded font-bold">
+                          Âm lịch: {getCanChi(deathYear)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={deathYear}
+                        onChange={(e) => setDeathYear(e.target.value)}
+                        className="w-full p-2 border border-red-300 rounded bg-red-50/50 pr-24"
+                        placeholder="Ví dụ: 2012"
+                      />
+                      {birthYear && deathYear && !isNaN(parseYearStr(birthYear)) && !isNaN(parseYearStr(deathYear)) && (
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-semibold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">
+                          Mất lúc: {parseYearStr(deathYear) - parseYearStr(birthYear)} tuổi
+                        </span>
+                      )}
+                    </div>
                   </div>
                 )}
 
