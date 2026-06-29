@@ -668,7 +668,16 @@ export default function App() {
 
             {currentTab === 'family-tree' && <TreeView members={members} />}
 
-            {currentTab === 'member-table' && <MemberTableView members={members} />}
+            {currentTab === 'member-table' && (
+              <MemberTableView
+                members={members}
+                onAddMember={handleAddMember}
+                onEditMember={handleEditMember}
+                onDeleteMember={handleDeleteMember}
+                currentUser={currentUser}
+                onOpenLogin={() => setIsLoginModalOpen(true)}
+              />
+            )}
 
             {currentTab === 'member-list' && <MemberListView members={members} />}
 
