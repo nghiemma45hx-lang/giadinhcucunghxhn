@@ -462,20 +462,13 @@ export default function MemberTableView({
                                   <span className="text-gray-400 font-medium">Mất:</span>
                                   <span className="font-semibold text-gray-700">{m.deathYear || '—'}</span>
                                 </div>
-                                <div className="text-rose-600 font-bold text-[10px] bg-rose-50 border border-rose-100 rounded px-1.5 py-0.5 inline-block mt-0.5">
-                                  Tuổi đã mất: {age !== null ? `${age} tuổi` : 'Chưa rõ'}
-                                </div>
                                 {anniversary && (
-                                  <div className="text-amber-800 font-bold text-[10px] bg-amber-50 border border-amber-100 rounded px-1.5 py-0.5 inline-block ml-1 mt-0.5">
+                                  <div className="text-amber-800 font-bold text-[10px] bg-amber-50 border border-amber-100 rounded px-1.5 py-0.5 inline-block mt-0.5">
                                     Giỗ chạp: {anniversary}
                                   </div>
                                 )}
                               </>
-                            ) : (
-                              <div className="text-emerald-700 font-bold text-[10px] bg-emerald-50 border border-emerald-100 rounded px-1.5 py-0.5 inline-block mt-0.5">
-                                Tuổi đang hưởng: {age !== null ? `${age} tuổi` : 'Chưa rõ'}
-                              </div>
-                            )}
+                            ) : null}
                           </div>
                         );
                       })()}
