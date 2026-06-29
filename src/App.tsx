@@ -448,7 +448,7 @@ export default function App() {
   const handleExportWord = () => {
     // Elegant download trigger
     const content = `GIA PHẢ GIA ĐÌNH CỤ NGHIÊM CUNG\n\nDanh sách dòng tộc chi thứ đời 15 - 19:\n\n` + 
-                    members.map(m => `- Đời ${m.generation}: ${m.name} (${m.role}) - ${m.isDeceased ? 'Đã mất' : 'Tại thế'}`).join('\n') + 
+                    members.map(m => `- Đời ${m.generation}: ${m.name} (${m.role}) - ${m.isDeceased ? 'Đã mất' : 'Còn sống'}`).join('\n') + 
                     `\n\nXuất bản tại Hà Nội, năm 2026.`;
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -461,7 +461,7 @@ export default function App() {
 
   const handleExportPdf = () => {
     const content = `GIA PHẢ GIA ĐÌNH CỤ NGHIÊM CUNG\n\nChiết xuất báo cáo hồ sơ phả hệ kỹ thuật số\n\n` + 
-                    members.map(m => `[Thế hệ ${m.generation}] ${m.name} | Vai trò: ${m.role} | Trạng thái: ${m.isDeceased ? 'Đã tạ thế' : 'Tại thế'} | Nơi ở: ${m.address || 'Hòa Xá'}`).join('\n') + 
+                    members.map(m => `[Thế hệ ${m.generation}] ${m.name} | Vai trò: ${m.role} | Trạng thái: ${m.isDeceased ? 'Đã tạ thế' : 'Còn sống'} | Nơi ở: ${m.address || 'Hòa Xá'}`).join('\n') + 
                     `\n\nTài liệu nội bộ lưu hành gia tộc.`;
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);

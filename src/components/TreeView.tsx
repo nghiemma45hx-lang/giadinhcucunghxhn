@@ -336,9 +336,52 @@ export default function TreeView({ members }: TreeViewProps) {
                 <div>
                   <span className="text-xs text-gray-400 font-bold block uppercase">Sinh / Mất:</span>
                   <span className="font-bold">
-                    Năm {selectedMember.birthYear || '---'} {selectedMember.isDeceased ? ` - Năm ${selectedMember.deathYear || 'Khuất'}` : ' (Tại thế)'}
+                    Năm {selectedMember.birthYear || '---'} {selectedMember.isDeceased ? ` - Năm ${selectedMember.deathYear || 'Khuất'}` : ' (Còn sống)'}
                   </span>
                 </div>
+                {(() => {
+                  const parseYearStr = (str: string): number => {
+                    if (!str) return NaN;
+                    const cleaned = str.trim();
+                    const match = cleaned.match(/\b\d{4}\b/);
+                    if (match) return parseInt(match[0], 10);
+                    return parseInt(cleaned, 10);
+                  };
+                  const bYear = parseYearStr(selectedMember.birthYear || '');
+                  const currentYear = 2026;
+                  
+                  if (selectedMember.isDeceased) {
+                    const dYear = parseYearStr(selectedMember.deathYear || '');
+                    const age = (!isNaN(bYear) && !isNaN(dYear)) ? (dYear - bYear) : null;
+                    let anniversary = '';
+                    if (selectedMember.deathYear) {
+                      const match = selectedMember.deathYear.trim().match(/^(\d{1,2}[\/\-]\d{1,2})/);
+                      if (match) anniversary = match[1];
+                    }
+                    return (
+                      <>
+                        <div>
+                          <span className="text-xs text-gray-400 font-bold block uppercase">Tuổi đã mất:</span>
+                          <span className="font-bold text-rose-600">{age !== null ? `${age} tuổi` : 'Chưa rõ'}</span>
+                        </div>
+                        {anniversary && (
+                          <div>
+                            <span className="text-xs text-gray-400 font-bold block uppercase">Ngày giỗ chạp:</span>
+                            <span className="font-bold text-amber-700">Ngày {anniversary}</span>
+                          </div>
+                        )}
+                      </>
+                    );
+                  } else {
+                    const age = !isNaN(bYear) ? (currentYear - bYear) : null;
+                    return (
+                      <div>
+                        <span className="text-xs text-gray-400 font-bold block uppercase">Tuổi đang hưởng:</span>
+                        <span className="font-bold text-emerald-600">{age !== null ? `${age} tuổi` : 'Chưa rõ'}</span>
+                      </div>
+                    );
+                  }
+                })()}
                 {selectedMember.occupation && (
                   <div>
                     <span className="text-xs text-gray-400 font-bold block uppercase">Nghề nghiệp:</span>

@@ -88,7 +88,7 @@ export default function StatisticsView({ members }: StatisticsViewProps) {
             <div>
               <span className="text-xs font-bold text-gray-400 uppercase">Trạng Thái Sinh Trưởng</span>
               <h3 className="text-2xl font-bold text-[#6b4724] font-serif mt-1">
-                {living.length} Tại thế / {deceased.length} Khuất †
+                {living.length} Còn sống / {deceased.length} Khuất †
               </h3>
               <p className="text-xs text-gray-500 mt-2">
                 {living.length} con cháu đang tiếp tục phát huy truyền thống tổ tiên.

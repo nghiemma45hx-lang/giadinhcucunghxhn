@@ -471,7 +471,7 @@ export default function AdminView({
                         {m.isDeceased ? (
                           <span className="px-2 py-0.5 bg-gray-100 text-gray-500 border border-gray-200 text-[10px] font-bold rounded-full">Đã khuất †</span>
                         ) : (
-                          <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-200 text-[10px] font-bold rounded-full">Tại thế</span>
+                          <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-200 text-[10px] font-bold rounded-full">Còn sống</span>
                         )}
                       </td>
                       <td className="p-3 text-right">

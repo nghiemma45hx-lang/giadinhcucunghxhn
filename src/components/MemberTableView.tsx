@@ -430,12 +430,55 @@ export default function MemberTableView({
                         </span>
                       ) : (
                         <span className="text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded text-[10px] font-bold">
-                          Tại thế
+                          Còn sống
                         </span>
                       )}
                     </td>
-                    <td className="p-3.5 text-gray-500">
-                      {m.birthYear ? m.birthYear : 'Chưa rõ'} {m.isDeceased && m.deathYear ? `- ${m.deathYear}` : ''}
+                    <td className="p-3.5">
+                      {(() => {
+                        const bYear = parseYearStr(m.birthYear || '');
+                        const dYear = m.isDeceased ? parseYearStr(m.deathYear || '') : NaN;
+                        const age = m.isDeceased 
+                          ? (!isNaN(bYear) && !isNaN(dYear) ? (dYear - bYear) : null)
+                          : (!isNaN(bYear) ? (2026 - bYear) : null);
+                        
+                        let anniversary = '';
+                        if (m.isDeceased && m.deathYear) {
+                          const match = m.deathYear.trim().match(/^(\d{1,2}[\/\-]\d{1,2})/);
+                          if (match) {
+                            anniversary = match[1];
+                          }
+                        }
+
+                        return (
+                          <div className="space-y-1 text-xs">
+                            <div className="flex items-center gap-1">
+                              <span className="text-gray-400 font-medium">Sinh:</span>
+                              <span className="font-semibold text-gray-700">{m.birthYear || '—'}</span>
+                            </div>
+                            {m.isDeceased ? (
+                              <>
+                                <div className="flex items-center gap-1">
+                                  <span className="text-gray-400 font-medium">Mất:</span>
+                                  <span className="font-semibold text-gray-700">{m.deathYear || '—'}</span>
+                                </div>
+                                <div className="text-rose-600 font-bold text-[10px] bg-rose-50 border border-rose-100 rounded px-1.5 py-0.5 inline-block mt-0.5">
+                                  Tuổi đã mất: {age !== null ? `${age} tuổi` : 'Chưa rõ'}
+                                </div>
+                                {anniversary && (
+                                  <div className="text-amber-800 font-bold text-[10px] bg-amber-50 border border-amber-100 rounded px-1.5 py-0.5 inline-block ml-1 mt-0.5">
+                                    Giỗ chạp: {anniversary}
+                                  </div>
+                                )}
+                              </>
+                            ) : (
+                              <div className="text-emerald-700 font-bold text-[10px] bg-emerald-50 border border-emerald-100 rounded px-1.5 py-0.5 inline-block mt-0.5">
+                                Tuổi đang hưởng: {age !== null ? `${age} tuổi` : 'Chưa rõ'}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="p-3.5 max-w-[150px] truncate text-gray-500" title={m.address}>
                       {m.address || 'Hòa Xá'}
