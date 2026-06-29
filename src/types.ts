@@ -1,0 +1,41 @@
+export interface FamilyMember {
+  id: string;
+  name: string;
+  gender: 'male' | 'female';
+  generation: number;
+  role: string;
+  birthYear?: string;
+  deathYear?: string;
+  isDeceased: boolean;
+  parentId?: string; // Links to parent (usually father)
+  spouseId?: string; // Main spouse ID
+  spouseIds?: string[]; // Supports multiple spouses
+  branch: string; // "Nhánh chính", "Chi Cụ Bà Cả", "Chi Cụ Bà Hai", etc.
+  story?: string;
+  occupation?: string;
+  address?: string;
+  phone?: string;
+}
+
+export interface AltarPrayer {
+  id: string;
+  sender: string;
+  message: string;
+  timestamp: string;
+  offeringType: 'incense' | 'candle' | 'flower' | 'none';
+}
+
+export interface Announcement {
+  id: string;
+  title: string;
+  content: string;
+  type: 'urgent' | 'update' | 'event';
+  date: string;
+}
+
+export interface SystemLog {
+  id: string;
+  action: string;
+  user: string;
+  timestamp: string;
+}
