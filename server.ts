@@ -215,17 +215,81 @@ app.get("/api/templates/download", (req, res) => {
       const htmlDoc = `
         <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
         <head>
-          <meta charset="utf-8">
+          <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
           <style>
-            body { font-family: 'Times New Roman', Times, serif; line-height: 1.6; margin: 1in; color: #333333; }
-            h1 { text-align: center; color: #5d4037; font-size: 20pt; margin-bottom: 5pt; font-weight: bold; }
-            .subtitle { text-align: center; font-style: italic; color: #555555; font-size: 11pt; margin-bottom: 25pt; }
-            h2 { color: #8b7355; font-size: 14pt; border-bottom: 2px solid #b8956b; padding-bottom: 3px; margin-top: 25pt; font-weight: bold; }
-            table { width: 100%; border-collapse: collapse; margin-top: 10pt; margin-bottom: 15pt; }
-            th, td { border: 1px solid #d6b583; padding: 10px; text-align: left; font-size: 10pt; }
-            th { background-color: #fdfbf7; font-weight: bold; color: #5d4037; }
-            .note-box { background-color: #fffde7; border-left: 4px solid #fbc02d; padding: 10px; margin: 15pt 0; font-size: 9.5pt; color: #5d4037; }
-            .sample-narrative { background-color: #fafafa; border: 1px dashed #cccccc; padding: 12px; font-size: 10pt; line-height: 1.5; color: #444444; }
+            @page {
+              size: 8.5in 11.0in;
+              margin: 1.0in 1.0in 1.0in 1.0in;
+              mso-header-margin: .5in;
+              mso-footer-margin: .5in;
+              mso-paper-source: 0;
+            }
+            body { 
+              font-family: "Times New Roman", Times, serif; 
+              line-height: 1.6; 
+              color: #333333; 
+            }
+            h1 { 
+              text-align: center; 
+              color: #5d4037; 
+              font-size: 20pt; 
+              margin-bottom: 5pt; 
+              font-weight: bold; 
+              font-family: "Times New Roman", Times, serif; 
+            }
+            .subtitle { 
+              text-align: center; 
+              font-style: italic; 
+              color: #555555; 
+              font-size: 11pt; 
+              margin-bottom: 25pt; 
+              font-family: "Times New Roman", Times, serif; 
+            }
+            h2 { 
+              color: #8b7355; 
+              font-size: 14pt; 
+              border-bottom: 2px solid #b8956b; 
+              padding-bottom: 3px; 
+              margin-top: 25pt; 
+              font-weight: bold; 
+              font-family: "Times New Roman", Times, serif; 
+            }
+            table { 
+              width: 100%; 
+              border-collapse: collapse; 
+              margin-top: 10pt; 
+              margin-bottom: 15pt; 
+            }
+            th, td { 
+              border: 1px solid #d6b583; 
+              padding: 10px; 
+              text-align: left; 
+              font-size: 10pt; 
+              font-family: "Times New Roman", Times, serif; 
+            }
+            th { 
+              background-color: #fdfbf7; 
+              font-weight: bold; 
+              color: #5d4037; 
+            }
+            .note-box { 
+              background-color: #fffde7; 
+              border-left: 4px solid #fbc02d; 
+              padding: 10px; 
+              margin: 15pt 0; 
+              font-size: 9.5pt; 
+              color: #5d4037; 
+              font-family: "Times New Roman", Times, serif; 
+            }
+            .sample-narrative { 
+              background-color: #fafafa; 
+              border: 1px dashed #cccccc; 
+              padding: 12px; 
+              font-size: 10pt; 
+              line-height: 1.5; 
+              color: #444444; 
+              font-family: "Times New Roman", Times, serif; 
+            }
           </style>
         </head>
         <body>
@@ -602,11 +666,52 @@ app.post("/api/members/parse-document", async (req, res) => {
           return "";
         };
 
-        const parsedMembers = rows.map((r, idx) => {
-          const id = findVal(r, ["id", "mã số", "ma so", "mã"]);
+        // Helper: Convert Vietnamese accented string to clean slug/id
+        const toSlug = (str: string): string => {
+          if (!str) return "";
+          return str
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "") // remove accent marks
+            .replace(/[đĐ]/g, "d")
+            .replace(/[^a-z0-9\s-]/g, "") // remove punctuation
+            .trim()
+            .replace(/\s+/g, "-"); // replace spaces with dashes
+        };
+
+        // Filter out completely empty rows where name is missing or empty
+        const filteredRows = rows.filter(r => {
           const name = findVal(r, ["name", "họ và tên", "ho va ten", "họ & tên", "ho & ten", "tên"]);
-          const genderStr = findVal(r, ["gender", "giới tính", "gioi tinh"]).toLowerCase();
-          const gender = genderStr.includes("nữ") || genderStr.includes("female") ? "female" : "male";
+          return name && name.trim().length > 0;
+        });
+
+        if (filteredRows.length === 0) {
+          return res.status(400).json({ error: "Không tìm thấy thành viên nào có tên hợp lệ trong tệp Excel của bạn." });
+        }
+
+        // Build a map of Name and Slug to ID for auto-resolving relations
+        const nameToIdMap = new Map<string, string>();
+        const slugToIdMap = new Map<string, string>();
+
+        // First pass: create basic records and populate name/slug map
+        const tempParsedMembers = filteredRows.map((r, idx) => {
+          const rawId = findVal(r, ["id", "mã số", "ma so", "mã"]);
+          const name = findVal(r, ["name", "họ và tên", "ho va ten", "họ & tên", "ho & ten", "tên"]);
+          
+          // Generate a clean slug ID if none is supplied
+          const id = rawId || toSlug(name) || `m-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 4)}`;
+          
+          if (name) {
+            nameToIdMap.set(name.toLowerCase().trim(), id);
+            const slug = toSlug(name);
+            if (slug) {
+              slugToIdMap.set(slug, id);
+            }
+          }
+
+          const genderStr = findVal(r, ["gender", "giới tính", "gioi tinh", "giới", "gioi"]).toLowerCase();
+          const isFemale = genderStr.includes("nữ") || genderStr.includes("female") || genderStr.includes("gái") || genderStr.startsWith("f") || genderStr === "nu";
+          const gender = isFemale ? "female" : "male";
           
           const genStr = findVal(r, ["generation", "đời thứ", "doi thu", "đời", "doi"]);
           const generation = parseInt(genStr) || 18;
@@ -615,22 +720,22 @@ app.post("/api/members/parse-document", async (req, res) => {
           const birthYear = findVal(r, ["birthyear", "năm sinh", "nam sinh", "sinh"]);
           const deathYear = findVal(r, ["deathyear", "năm mất", "nam mat", "mất", "mat"]);
           const deceasedStr = findVal(r, ["isdeceased", "đã mất", "da mat", "deceased"]).toLowerCase();
-          const isDeceased = deceasedStr.includes("true") || deceasedStr.includes("có") || deceasedStr.includes("đã mất") || deathYear !== "";
+          const isDeceased = deceasedStr.includes("true") || deceasedStr.includes("có") || deceasedStr.includes("đã mất") || deceasedStr.includes("mất") || deceasedStr.includes("qua đời") || deceasedStr.includes("tạ thế") || deceasedStr.includes("đã khuất") || deceasedStr === "1" || deceasedStr === "x" || deceasedStr === "yes" || deathYear !== "";
           
-          const parentId = findVal(r, ["parentid", "mã cha", "ma cha", "cha"]);
-          const motherId = findVal(r, ["motherid", "mã mẹ", "ma me", "mẹ"]);
-          const spouseId = findVal(r, ["spouseid", "mã vợ/chồng", "vợ", "chồng", "ma vo", "ma chong"]);
-          const marriedStr = findVal(r, ["ismarried", "đã kết hôn", "da ket hon", "kết hôn", "ket hon"]).toLowerCase();
-          const isMarried = marriedStr.includes("true") || marriedStr.includes("có") || spouseId !== "";
+          const parentIdInput = findVal(r, ["parentid", "mã cha", "ma cha", "cha", "tên cha", "ten cha"]);
+          const motherIdInput = findVal(r, ["motherid", "mã mẹ", "ma me", "mẹ", "tên mẹ", "ten me"]);
+          const spouseIdInput = findVal(r, ["spouseid", "mã vợ/chồng", "vợ", "chồng", "ma vo", "ma chong", "tên vợ", "tên chồng", "ten vo", "ten chong"]);
+          const marriedStr = findVal(r, ["ismarried", "đã kết hôn", "da ket hon", "kết hôn", "ket hon", "hôn nhân"]).toLowerCase();
+          const isMarried = marriedStr.includes("true") || marriedStr.includes("có") || marriedStr.includes("kết hôn") || marriedStr === "1" || marriedStr === "x" || marriedStr === "yes" || spouseIdInput !== "";
           
-          const branch = findVal(r, ["branch", "chi nhánh", "chi nhanh", "phân chi"]) || "Nhánh chính";
+          const branch = findVal(r, ["branch", "chi nhánh", "chi nhanh", "phân chi", "nhánh"]) || "Nhánh chính";
           const story = findVal(r, ["story", "tiểu sử", "tieu su", "ghi chú"]);
           const occupation = findVal(r, ["occupation", "nghề nghiệp", "nghe nghiep"]);
           const address = findVal(r, ["address", "địa chỉ", "dia chi", "quê quán"]);
           const phone = findVal(r, ["phone", "điện thoại", "dien thoai", "sđt", "sdt"]);
 
           return {
-            id: id || `m-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 4)}`,
+            id,
             name: name || "Thành viên gia phả",
             gender,
             generation,
@@ -638,15 +743,62 @@ app.post("/api/members/parse-document", async (req, res) => {
             birthYear: birthYear || undefined,
             deathYear: isDeceased ? (deathYear || undefined) : undefined,
             isDeceased,
-            parentId: parentId || undefined,
-            motherId: motherId || undefined,
-            spouseId: spouseId || undefined,
+            parentId: parentIdInput, // Keep raw value to resolve in next pass
+            motherId: motherIdInput, // Keep raw value to resolve in next pass
+            spouseId: spouseIdInput, // Keep raw value to resolve in next pass
             isMarried: isMarried || undefined,
             branch: branch || "Nhánh chính",
             story: story || undefined,
             occupation: occupation || undefined,
             address: address || undefined,
             phone: phone || undefined
+          };
+        });
+
+        // Second pass: Auto-resolve human names or slugs to actual IDs
+        const parsedMembers = tempParsedMembers.map(m => {
+          let pId = m.parentId ? m.parentId.trim() : "";
+          let mId = m.motherId ? m.motherId.trim() : "";
+          let sId = m.spouseId ? m.spouseId.trim() : "";
+
+          // Resolve parentId
+          if (pId) {
+            const pLower = pId.toLowerCase();
+            const pSlug = toSlug(pId);
+            if (nameToIdMap.has(pLower)) {
+              pId = nameToIdMap.get(pLower) || "";
+            } else if (slugToIdMap.has(pSlug)) {
+              pId = slugToIdMap.get(pSlug) || "";
+            }
+          }
+
+          // Resolve motherId
+          if (mId) {
+            const mLower = mId.toLowerCase();
+            const mSlug = toSlug(mId);
+            if (nameToIdMap.has(mLower)) {
+              mId = nameToIdMap.get(mLower) || "";
+            } else if (slugToIdMap.has(mSlug)) {
+              mId = slugToIdMap.get(mSlug) || "";
+            }
+          }
+
+          // Resolve spouseId
+          if (sId) {
+            const sLower = sId.toLowerCase();
+            const sSlug = toSlug(sId);
+            if (nameToIdMap.has(sLower)) {
+              sId = nameToIdMap.get(sLower) || "";
+            } else if (slugToIdMap.has(sSlug)) {
+              sId = slugToIdMap.get(sSlug) || "";
+            }
+          }
+
+          return {
+            ...m,
+            parentId: pId || undefined,
+            motherId: mId || undefined,
+            spouseId: sId || undefined
           };
         });
 

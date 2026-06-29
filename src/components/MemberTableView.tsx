@@ -222,16 +222,13 @@ export default function MemberTableView({
     const reader = new FileReader();
     reader.onload = async (event) => {
       try {
-        const arrayBuffer = event.target?.result as ArrayBuffer;
-        
-        // Convert arrayBuffer to Base64 safely
-        const bytes = new Uint8Array(arrayBuffer);
-        let binaryStr = '';
-        const len = bytes.byteLength;
-        for (let i = 0; i < len; i++) {
-          binaryStr += String.fromCharCode(bytes[i]);
+        const dataUrl = event.target?.result as string;
+        if (!dataUrl) {
+          throw new Error('Không thể đọc dữ liệu từ tệp này.');
         }
-        const base64String = btoa(binaryStr);
+        
+        // Extract base64 part from the data URL
+        const base64String = dataUrl.split(',')[1];
 
         const response = await fetch('/api/members/parse-document', {
           method: 'POST',
@@ -265,7 +262,7 @@ export default function MemberTableView({
         alert(err.message || 'Lỗi đọc tệp.');
       }
     };
-    reader.readAsArrayBuffer(file);
+    reader.readAsDataURL(file);
     e.target.value = '';
   };
 
