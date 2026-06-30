@@ -4,6 +4,7 @@ import { Settings, PlusCircle, Trash2, Edit2, Users, Bell, Activity, Save, X, Pl
 import { getLunarDate } from 'vietnamese-lunar-calendar';
 import { FamilyMember, Announcement, SystemLog, SystemUser } from '../types';
 import { ImageUploader } from './ImageUploader';
+import { SearchableSelect } from './SearchableSelect';
 
 interface AdminViewProps {
   members: FamilyMember[];
@@ -1205,18 +1206,20 @@ export default function AdminView({
                         )}
                       </div>
                     </div>
-                    <select
-                      value={parentId}
-                      onChange={(e) => setParentId(e.target.value)}
-                      className="w-full p-2 border border-[#d6b583] rounded bg-white cursor-pointer"
-                    >
-                      <option value="">-- Không có hoặc là Cụ tổ --</option>
-                      {members
+                    <SearchableSelect
+                      options={members
                         .filter(m => m.gender === 'male' && m.id !== (editingMember?.id || ''))
-                        .map(m => (
-                          <option key={m.id} value={m.id}>{m.name} (Đời {m.generation})</option>
-                        ))}
-                    </select>
+                        .map(m => ({
+                          value: m.id,
+                          label: m.name,
+                          sublabel: `Đời ${m.generation}${m.birthYear ? ` • Sinh năm ${m.birthYear}` : ''}${m.isDeceased ? ' • Đã khuất †' : ''}`
+                        }))}
+                      value={parentId}
+                      onChange={setParentId}
+                      placeholder="Tìm cha theo tên, đời hoặc năm sinh..."
+                      noneOptionLabel="-- Không có hoặc là Cụ tổ --"
+                      emptyLabel="Không tìm thấy cha phù hợp"
+                    />
                   </div>
 
                   {/* Mother Link (Thêm tính năng liên mẫu thân (Mẹ) vào ô đỏ dài dưới ô Liên kết thân phụ) */}
@@ -1257,18 +1260,20 @@ export default function AdminView({
                         )}
                       </div>
                     </div>
-                    <select
-                      value={motherId}
-                      onChange={(e) => setMotherId(e.target.value)}
-                      className="w-full p-2 border border-rose-200 rounded bg-white cursor-pointer text-rose-950 font-medium"
-                    >
-                      <option value="">-- Không có hoặc Chưa rõ mẫu thân --</option>
-                      {members
+                    <SearchableSelect
+                      options={members
                         .filter(m => m.gender === 'female' && m.id !== (editingMember?.id || ''))
-                        .map(m => (
-                          <option key={m.id} value={m.id}>{m.name} (Đời {m.generation})</option>
-                        ))}
-                    </select>
+                        .map(m => ({
+                          value: m.id,
+                          label: m.name,
+                          sublabel: `Đời ${m.generation}${m.birthYear ? ` • Sinh năm ${m.birthYear}` : ''}${m.isDeceased ? ' • Đã khuất †' : ''}`
+                        }))}
+                      value={motherId}
+                      onChange={setMotherId}
+                      placeholder="Tìm mẹ theo tên, đời hoặc năm sinh..."
+                      noneOptionLabel="-- Không có hoặc Chưa rõ mẫu thân --"
+                      emptyLabel="Không tìm thấy mẹ phù hợp"
+                    />
                   </div>
                 </div>
 
