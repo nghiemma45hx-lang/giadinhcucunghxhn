@@ -109,12 +109,7 @@ const getSupabaseClient = () => {
     }
   } else {
     url = fallbackUrl;
-    // Use verified process.env.SUPABASE_SERVICE_ROLE_KEY if it exists and is valid JWT
-    if (key && key.startsWith("eyJ") && key.split(".").length === 3 && key !== "MY_SUPABASE_SERVICE_ROLE_KEY" && key !== "SUPABASE_SERVICE_ROLE_KEY") {
-      // Keep using verified key
-    } else {
-      key = fallbackKey;
-    }
+    key = fallbackKey;
   }
 
   return createClient(url, key, {
