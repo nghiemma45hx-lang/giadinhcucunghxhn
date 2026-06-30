@@ -2,6 +2,218 @@ import React, { useState, useRef } from 'react';
 import { Users, Eye, HelpCircle, User, Award, ArrowRight, Heart, RefreshCw, Download, FileDown } from 'lucide-react';
 import { FamilyMember } from '../types';
 import html2canvas from 'html2canvas';
+
+// Helper to run html2canvas safely by temporarily replacing unsupported oklch/oklab colors
+const runHtml2CanvasSafely = async (element: HTMLElement, options: any) => {
+  const stylesToRestore: { element: HTMLStyleElement; originalHTML: string }[] = [];
+  const inlineStylesToRestore: { element: HTMLElement; originalStyle: string }[] = [];
+  
+  try {
+    // 1. Temporarily patch all <style> elements on the main document
+    const styleElements = document.getElementsByTagName('style');
+    for (let i = 0; i < styleElements.length; i++) {
+      const style = styleElements[i];
+      if (style.innerHTML && (style.innerHTML.includes('oklch') || style.innerHTML.includes('oklab'))) {
+        stylesToRestore.push({ element: style, originalHTML: style.innerHTML });
+        style.innerHTML = style.innerHTML
+          .replace(/oklch\([^)]+\)/g, 'rgb(184, 149, 107)')
+          .replace(/oklab\([^)]+\)/g, 'rgb(184, 149, 107)');
+      }
+    }
+
+    // 2. Temporarily patch all inline styles on elements that have oklch/oklab
+    const allElements = document.getElementsByTagName('*');
+    for (let i = 0; i < allElements.length; i++) {
+      const el = allElements[i] as HTMLElement;
+      if (el.style && el.style.cssText) {
+        if (el.style.cssText.includes('oklch') || el.style.cssText.includes('oklab')) {
+          inlineStylesToRestore.push({ element: el, originalStyle: el.style.cssText });
+          el.style.cssText = el.style.cssText
+            .replace(/oklch\([^)]+\)/g, 'rgb(184, 149, 107)')
+            .replace(/oklab\([^)]+\)/g, 'rgb(184, 149, 107)');
+        }
+      }
+    }
+
+    // 3. Call html2canvas
+    return await html2canvas(element, options);
+  } finally {
+    // 4. Restore everything!
+    for (const item of stylesToRestore) {
+      try {
+        item.element.innerHTML = item.originalHTML;
+      } catch (e) {
+        console.error('Failed to restore style', e);
+      }
+    }
+    for (const item of inlineStylesToRestore) {
+      try {
+        item.element.style.cssText = item.originalStyle;
+      } catch (e) {
+        console.error('Failed to restore inline style', e);
+      }
+    }
+  }
+};
+
+// Helper to run html2canvas safely by temporarily replacing unsupported oklch/oklab colors
+const runHtml2CanvasSafely = async (element: HTMLElement, options: any) => {
+  const stylesToRestore: { element: HTMLStyleElement; originalHTML: string }[] = [];
+  const inlineStylesToRestore: { element: HTMLElement; originalStyle: string }[] = [];
+  
+  try {
+    // 1. Temporarily patch all <style> elements on the main document
+    const styleElements = document.getElementsByTagName('style');
+    for (let i = 0; i < styleElements.length; i++) {
+      const style = styleElements[i];
+      if (style.innerHTML && (style.innerHTML.includes('oklch') || style.innerHTML.includes('oklab'))) {
+        stylesToRestore.push({ element: style, originalHTML: style.innerHTML });
+        style.innerHTML = style.innerHTML
+          .replace(/oklch\([^)]+\)/g, 'rgb(184, 149, 107)')
+          .replace(/oklab\([^)]+\)/g, 'rgb(184, 149, 107)');
+      }
+    }
+
+    // 2. Temporarily patch all inline styles on elements that have oklch/oklab
+    const allElements = document.getElementsByTagName('*');
+    for (let i = 0; i < allElements.length; i++) {
+      const el = allElements[i] as HTMLElement;
+      if (el.style && el.style.cssText) {
+        if (el.style.cssText.includes('oklch') || el.style.cssText.includes('oklab')) {
+          inlineStylesToRestore.push({ element: el, originalStyle: el.style.cssText });
+          el.style.cssText = el.style.cssText
+            .replace(/oklch\([^)]+\)/g, 'rgb(184, 149, 107)')
+            .replace(/oklab\([^)]+\)/g, 'rgb(184, 149, 107)');
+        }
+      }
+    }
+
+    // 3. Call html2canvas
+    return await html2canvas(element, options);
+  } finally {
+    // 4. Restore everything!
+    for (const item of stylesToRestore) {
+      try {
+        item.element.innerHTML = item.originalHTML;
+      } catch (e) {
+        console.error('Failed to restore style', e);
+      }
+    }
+    for (const item of inlineStylesToRestore) {
+      try {
+        item.element.style.cssText = item.originalStyle;
+      } catch (e) {
+        console.error('Failed to restore inline style', e);
+      }
+    }
+  }
+};
+
+// Helper to run html2canvas safely by temporarily replacing unsupported oklch/oklab colors
+const runHtml2CanvasSafely = async (element: HTMLElement, options: any) => {
+  const stylesToRestore: { element: HTMLStyleElement; originalHTML: string }[] = [];
+  const inlineStylesToRestore: { element: HTMLElement; originalStyle: string }[] = [];
+  
+  try {
+    // 1. Temporarily patch all <style> elements on the main document
+    const styleElements = document.getElementsByTagName('style');
+    for (let i = 0; i < styleElements.length; i++) {
+      const style = styleElements[i];
+      if (style.innerHTML && (style.innerHTML.includes('oklch') || style.innerHTML.includes('oklab'))) {
+        stylesToRestore.push({ element: style, originalHTML: style.innerHTML });
+        style.innerHTML = style.innerHTML
+          .replace(/oklch\([^)]+\)/g, 'rgb(184, 149, 107)')
+          .replace(/oklab\([^)]+\)/g, 'rgb(184, 149, 107)');
+      }
+    }
+
+    // 2. Temporarily patch all inline styles on elements that have oklch/oklab
+    const allElements = document.getElementsByTagName('*');
+    for (let i = 0; i < allElements.length; i++) {
+      const el = allElements[i] as HTMLElement;
+      if (el.style && el.style.cssText) {
+        if (el.style.cssText.includes('oklch') || el.style.cssText.includes('oklab')) {
+          inlineStylesToRestore.push({ element: el, originalStyle: el.style.cssText });
+          el.style.cssText = el.style.cssText
+            .replace(/oklch\([^)]+\)/g, 'rgb(184, 149, 107)')
+            .replace(/oklab\([^)]+\)/g, 'rgb(184, 149, 107)');
+        }
+      }
+    }
+
+    // 3. Call html2canvas
+    return await html2canvas(element, options);
+  } finally {
+    // 4. Restore everything!
+    for (const item of stylesToRestore) {
+      try {
+        item.element.innerHTML = item.originalHTML;
+      } catch (e) {
+        console.error('Failed to restore style', e);
+      }
+    }
+    for (const item of inlineStylesToRestore) {
+      try {
+        item.element.style.cssText = item.originalStyle;
+      } catch (e) {
+        console.error('Failed to restore inline style', e);
+      }
+    }
+  }
+};
+
+// Helper to run html2canvas safely by temporarily replacing unsupported oklch/oklab colors
+const runHtml2CanvasSafely = async (element: HTMLElement, options: any) => {
+  const stylesToRestore: { element: HTMLStyleElement; originalHTML: string }[] = [];
+  const inlineStylesToRestore: { element: HTMLElement; originalStyle: string }[] = [];
+  
+  try {
+    // 1. Temporarily patch all <style> elements on the main document
+    const styleElements = document.getElementsByTagName('style');
+    for (let i = 0; i < styleElements.length; i++) {
+      const style = styleElements[i];
+      if (style.innerHTML && (style.innerHTML.includes('oklch') || style.innerHTML.includes('oklab'))) {
+        stylesToRestore.push({ element: style, originalHTML: style.innerHTML });
+        style.innerHTML = style.innerHTML
+          .replace(/oklch\([^)]+\)/g, 'rgb(184, 149, 107)')
+          .replace(/oklab\([^)]+\)/g, 'rgb(184, 149, 107)');
+      }
+    }
+
+    // 2. Temporarily patch all inline styles on elements that have oklch/oklab
+    const allElements = document.getElementsByTagName('*');
+    for (let i = 0; i < allElements.length; i++) {
+      const el = allElements[i] as HTMLElement;
+      if (el.style && el.style.cssText) {
+        if (el.style.cssText.includes('oklch') || el.style.cssText.includes('oklab')) {
+          inlineStylesToRestore.push({ element: el, originalStyle: el.style.cssText });
+          el.style.cssText = el.style.cssText
+            .replace(/oklch\([^)]+\)/g, 'rgb(184, 149, 107)')
+            .replace(/oklab\([^)]+\)/g, 'rgb(184, 149, 107)');
+        }
+      }
+    }
+
+    // 3. Call html2canvas
+    return await html2canvas(element, options);
+  } finally {
+    // 4. Restore everything!
+    for (const item of stylesToRestore) {
+      try {
+        item.element.innerHTML = item.originalHTML;
+      } catch (e) {
+        console.error('Failed to restore style', e);
+      }
+    }
+    for (const item of inlineStylesToRestore) {
+      try {
+        item.element.style.cssText = item.originalStyle;
+      } catch (e) {
+        console.error('Failed to restore inline style', e);
+      }
+    }
+  }
+};
 import jsPDF from 'jspdf';
 
 interface TreeViewProps {
