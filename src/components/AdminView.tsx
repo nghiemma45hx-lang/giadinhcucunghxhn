@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
-import { Settings, PlusCircle, Trash2, Edit2, Users, Bell, Activity, Save, X, Plus, Image, Key, Shield, Eye, EyeOff } from 'lucide-react';
+import { Settings, PlusCircle, Trash2, Edit2, Users, Bell, Activity, Save, X, Plus, Image, Key, Shield, Eye, EyeOff, Database } from 'lucide-react';
 // @ts-ignore
 import { LunarDate } from 'vietnamese-lunar-calendar';
 import { FamilyMember, Announcement, SystemLog, SystemUser } from '../types';
@@ -25,6 +25,16 @@ interface AdminViewProps {
   onAddUser: (user: SystemUser) => Promise<void>;
   onDeleteUser: (username: string) => Promise<void>;
 }
+
+// Helper to construct dynamic API Backend URL
+const getApiUrl = (path: string): string => {
+  const storedUrl = localStorage.getItem('gia_pha_api_backend_url');
+  if (storedUrl && storedUrl.trim()) {
+    const base = storedUrl.trim().endsWith('/') ? storedUrl.trim().slice(0, -1) : storedUrl.trim();
+    return `${base}${path}`;
+  }
+  return path;
+};
 
 export default function AdminView({
   members,
@@ -97,6 +107,75 @@ export default function AdminView({
   const [settingsIntroText2, setSettingsIntroText2] = useState(settings.introText2 || 'Gia phả gia đình dòng họ Cụ Nghiêm Cung (kế thừa dòng dõi cụ cố Nghiêm Điều (Chu) tại vùng đất Hòa Xá cổ kính, giàu truyền thống cách mạng) được lập ra nhằm mục đích kính cáo tổ tông, ghi chép tường tận huyết mạch dòng giống, lưu truyền cho con cháu vạn đời sau không bao giờ quên đi nguồn cội thiêng liêng của mình.');
   const [settingsIntroText3, setSettingsIntroText3] = useState(settings.introText3 || 'Trải qua bao thăng trầm của lịch sử, con cháu họ Nghiêm luôn gìn giữ nếp gia phong nghiêm cẩn, lấy hiếu học làm đầu, lấy đức độ làm trọng, lấy trung thực làm gương và hết lòng đùm bọc, giúp đỡ lẫn nhau vượt qua gian khó, lập thân kiến nghiệp làm rạng danh gia đình.');
   const [apiBackendUrl, setApiBackendUrl] = useState(localStorage.getItem('gia_pha_api_backend_url') || '');
+
+  // Local states for Supabase Custom Configuration (Asian region support)
+  const [supabaseUrl, setSupabaseUrl] = useState('');
+  const [supabaseAnonKey, setSupabaseAnonKey] = useState('');
+  const [supabaseServiceRoleKey, setSupabaseServiceRoleKey] = useState('');
+  const [supabaseRegion, setSupabaseRegion] = useState('sydney');
+  const [dbStatus, setDbStatus] = useState<{ success: boolean; timestamp?: string; error?: any; workingKeyTruncated?: string } | null>(null);
+  const [isTestingDb, setIsTestingDb] = useState(false);
+
+  // Local helper to fetch current Supabase config
+  const fetchSupabaseConfig = async () => {
+    try {
+      const res = await fetch(getApiUrl('/api/config/supabase'));
+      if (res.ok) {
+        const data = await res.json();
+        if (data.config) {
+          setSupabaseUrl(data.config.url || '');
+          setSupabaseAnonKey(data.config.anonKey || '');
+          setSupabaseServiceRoleKey(data.config.serviceRoleKey || '');
+          setSupabaseRegion(data.config.region || 'sydney');
+        }
+        if (data.status) {
+          setDbStatus(data.status);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch supabase config", err);
+    }
+  };
+
+  // Load configuration on mount
+  React.useEffect(() => {
+    fetchSupabaseConfig();
+  }, []);
+
+  // Save and test Supabase configuration
+  const handleSaveAndTestSupabase = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsTestingDb(true);
+    try {
+      const res = await fetch(getApiUrl('/api/config/supabase'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: supabaseUrl,
+          anonKey: supabaseAnonKey,
+          serviceRoleKey: supabaseServiceRoleKey,
+          region: supabaseRegion
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.status) {
+          setDbStatus(data.status);
+          if (data.status.success) {
+            alert('Đồng bộ & Kết nối cơ sở dữ liệu Supabase thành công!');
+          } else {
+            alert(`Lỗi kết nối cơ sở dữ liệu: ${data.status.error?.message || 'Vui lòng kiểm tra lại URL và API key.'}`);
+          }
+        }
+      } else {
+        alert('Lưu cấu hình thất bại. Vui lòng kiểm tra máy chủ API.');
+      }
+    } catch (err: any) {
+      alert(`Đã xảy ra lỗi: ${err.message}`);
+    } finally {
+      setIsTestingDb(false);
+    }
+  };
 
   // Local states for custom user provisioning
   const [newUsername, setNewUsername] = useState('');
@@ -954,6 +1033,134 @@ export default function AdminView({
                       Sử dụng địa chỉ hiện tại ({window.location.origin})
                     </button>
                   </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-[#fdfbf7] p-4 rounded-xl border border-[#eadecb] space-y-4">
+              <h3 className="text-sm font-bold text-[#6b4724] font-serif uppercase tracking-wider flex items-center gap-1.5 border-b border-[#eadecb] pb-2">
+                <Database className="w-4 h-4 text-[#b8956b]" />
+                Cấu hình Vùng Cơ sở dữ liệu Supabase (Chuyển vùng Châu Á)
+              </h3>
+              <p className="text-[11px] text-[#6b4724] leading-relaxed">
+                Thiết lập vị trí lưu trữ dữ liệu phả hệ của dòng họ. Theo mặc định hệ thống chạy trên máy chủ Châu Đại Dương (Sydney, Úc). Quý khách có thể tự tạo một dự án Supabase mới đặt tại vùng <strong>Châu Á (Singapore)</strong> để tối ưu tốc độ và điền thông tin kết nối dưới đây:
+              </p>
+
+              <div className="space-y-4 text-xs">
+                <div>
+                  <label className="block font-bold text-[#6b4724] mb-1">Chọn Vùng Hoạt Động:</label>
+                  <select
+                    value={supabaseRegion}
+                    onChange={(e) => setSupabaseRegion(e.target.value)}
+                    className="w-full p-2.5 border border-[#d6b583] rounded bg-white font-medium focus:ring-1 focus:ring-[#b8956b] focus:outline-none text-xs text-[#4a331a]"
+                  >
+                    <option value="sydney">Châu Đại Dương (Sydney, Úc - Mặc định)</option>
+                    <option value="singapore">Châu Á (Singapore - Tối ưu nhất)</option>
+                    <option value="tokyo">Châu Á (Tokyo, Nhật Bản)</option>
+                    <option value="custom">Vùng tùy chọn khác</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-[#6b4724] mb-1">Supabase URL:</label>
+                  <input
+                    type="url"
+                    value={supabaseUrl}
+                    onChange={(e) => setSupabaseUrl(e.target.value)}
+                    className="w-full p-2.5 border border-[#d6b583] rounded bg-white font-medium focus:ring-1 focus:ring-[#b8956b] focus:outline-none text-xs text-[#4a331a]"
+                    placeholder="Ví dụ: https://xxxxxxxxx.supabase.co"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-[#6b4724] mb-1">Supabase Anon Key:</label>
+                    <input
+                      type="password"
+                      value={supabaseAnonKey}
+                      onChange={(e) => setSupabaseAnonKey(e.target.value)}
+                      className="w-full p-2.5 border border-[#d6b583] rounded bg-white font-medium focus:ring-1 focus:ring-[#b8956b] focus:outline-none text-xs text-[#4a331a]"
+                      placeholder="Dán public anon key..."
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-[#6b4724] mb-1">Supabase Service Role Key:</label>
+                    <input
+                      type="password"
+                      value={supabaseServiceRoleKey}
+                      onChange={(e) => setSupabaseServiceRoleKey(e.target.value)}
+                      className="w-full p-2.5 border border-[#d6b583] rounded bg-white font-medium focus:ring-1 focus:ring-[#b8956b] focus:outline-none text-xs text-[#4a331a]"
+                      placeholder={supabaseServiceRoleKey ? "••••••••••••••••••••••••" : "Dán service_role key..."}
+                    />
+                  </div>
+                </div>
+
+                {dbStatus && (
+                  <div className={`p-3 rounded border text-[11px] ${dbStatus.success ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800'}`}>
+                    <div className="font-bold flex items-center gap-1">
+                      <span className={`w-2 h-2 rounded-full ${dbStatus.success ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                      Trạng thái kết nối: {dbStatus.success ? 'Kết nối thành công!' : 'Lỗi kết nối / Chưa được cấu hình đúng'}
+                    </div>
+                    {dbStatus.workingKeyTruncated && (
+                      <div className="mt-1 font-mono text-[10px] opacity-80">
+                        Khóa đang sử dụng: {dbStatus.workingKeyTruncated}
+                      </div>
+                    )}
+                    {dbStatus.error && (
+                      <div className="mt-1 font-mono text-[10px] bg-white/50 p-1.5 rounded border border-rose-100 max-h-16 overflow-y-auto">
+                        {dbStatus.error.message || JSON.stringify(dbStatus.error)}
+                      </div>
+                    )}
+                    {dbStatus.timestamp && (
+                      <div className="mt-1 text-[10px] opacity-60">
+                        Kiểm tra lúc: {new Date(dbStatus.timestamp).toLocaleString('vi-VN')}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (window.confirm("Bạn có chắc chắn muốn khôi phục về Cơ sở dữ liệu mặc định hệ thống?")) {
+                        setSupabaseUrl('');
+                        setSupabaseAnonKey('');
+                        setSupabaseServiceRoleKey('');
+                        setSupabaseRegion('sydney');
+                        
+                        setIsTestingDb(true);
+                        try {
+                          const res = await fetch(getApiUrl('/api/config/supabase'), {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ url: '', serviceRoleKey: '', anonKey: '', region: 'sydney' })
+                          });
+                          if (res.ok) {
+                            const data = await res.json();
+                            setDbStatus(data.status);
+                            alert('Đã khôi phục về cơ sở dữ liệu mặc định (Úc)!');
+                          }
+                        } catch (err: any) {
+                          alert(`Lỗi: ${err.message}`);
+                        } finally {
+                          setIsTestingDb(false);
+                        }
+                      }
+                    }}
+                    className="px-3 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded font-bold transition text-xs"
+                  >
+                    Khôi phục mặc định
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveAndTestSupabase}
+                    disabled={isTestingDb}
+                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded font-bold transition flex items-center gap-1.5 text-xs disabled:opacity-50"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    {isTestingDb ? 'Đang kiểm tra...' : 'Kiểm tra & Kết nối Supabase'}
+                  </button>
                 </div>
               </div>
             </div>

@@ -59,11 +59,36 @@ const cleanEnvVar = (val: string | undefined): string | undefined => {
   console.log(logContent);
 })();
 
+// Helper to read and write custom Supabase configuration from a local file
+const CONFIG_FILE = path.join(process.cwd(), "supabase_config.json");
+
+const getCustomSupabaseConfig = () => {
+  try {
+    if (fs.existsSync(CONFIG_FILE)) {
+      return JSON.parse(fs.readFileSync(CONFIG_FILE, "utf-8"));
+    }
+  } catch (e) {
+    console.error("Failed to read custom supabase config:", e);
+  }
+  return null;
+};
+
 // Initialize Supabase Client with environment variable checks & fallback safety
 const getSupabaseClient = () => {
   let url = cleanEnvVar(process.env.SUPABASE_URL);
   let key = cleanEnvVar(process.env.SUPABASE_SERVICE_ROLE_KEY);
-  const anon = cleanEnvVar(process.env.SUPABASE_ANON_KEY);
+  let anon = cleanEnvVar(process.env.SUPABASE_ANON_KEY);
+
+  const customConfig = getCustomSupabaseConfig();
+  if (customConfig && customConfig.url) {
+    url = cleanEnvVar(customConfig.url);
+    if (customConfig.serviceRoleKey) {
+      key = cleanEnvVar(customConfig.serviceRoleKey);
+    }
+    if (customConfig.anonKey) {
+      anon = cleanEnvVar(customConfig.anonKey);
+    }
+  }
 
   const fallbackUrl = "https://domczpyfjiqttwdcrdsj.supabase.co";
   const fallbackKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRvbWN6cHlmamlxdHR3ZGNyZHNqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjcwMTM5NCwiZXhwIjoyMDk4Mjc3Mzk0fQ.-2ksd7TQPy6hDPwE2S2OWUzWC0ws04FjecgL2lhRWf";
@@ -94,12 +119,20 @@ const getSupabaseClient = () => {
   });
 };
 
-// Run a startup check on Supabase connection to diagnose and record issues
-(async () => {
+// Run a check on Supabase connection to diagnose and record issues
+const runSupabaseSelfTest = async () => {
   try {
-    const rawKey = cleanEnvVar(process.env.SUPABASE_SERVICE_ROLE_KEY) || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRvbWN6cHlmamlxdHR3ZGNyZHNqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjcwMTM5NCwiZXhwIjoyMDk4Mjc3Mzk0fQ.-2ksd7TQPy6hDPwE2S2OWUzWC0ws04FjecgL2lhRWf";
-    const url = cleanEnvVar(process.env.SUPABASE_URL) || "https://domczpyfjiqttwdcrdsj.supabase.co";
-    
+    const customConfig = getCustomSupabaseConfig();
+    let rawKey = cleanEnvVar(process.env.SUPABASE_SERVICE_ROLE_KEY) || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRvbWN6cHlmamlxdHR3ZGNyZHNqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjcwMTM5NCwiZXhwIjoyMDk4Mjc3Mzk0fQ.-2ksd7TQPy6hDPwE2S2OWUzWC0ws04FjecgL2lhRWf";
+    let url = cleanEnvVar(process.env.SUPABASE_URL) || "https://domczpyfjiqttwdcrdsj.supabase.co";
+
+    if (customConfig && customConfig.url) {
+      url = cleanEnvVar(customConfig.url);
+      if (customConfig.serviceRoleKey) {
+        rawKey = cleanEnvVar(customConfig.serviceRoleKey);
+      }
+    }
+
     let workingKey = "";
     let lastError: any = null;
 
@@ -156,11 +189,24 @@ const getSupabaseClient = () => {
 
     // If we found a working key, update the process environment so getSupabaseClient() uses it!
     if (workingKey) {
-      process.env.SUPABASE_SERVICE_ROLE_KEY = workingKey;
+      if (customConfig && customConfig.url) {
+        customConfig.serviceRoleKey = workingKey;
+        fs.writeFileSync(CONFIG_FILE, JSON.stringify(customConfig, null, 2), "utf-8");
+      } else {
+        process.env.SUPABASE_SERVICE_ROLE_KEY = workingKey;
+      }
     }
+    return status;
   } catch (e: any) {
-    fs.writeFileSync(path.join(process.cwd(), "db_status.json"), JSON.stringify({ error: e.message || e }, null, 2));
+    const errStatus = { success: false, error: { message: e.message || e } };
+    fs.writeFileSync(path.join(process.cwd(), "db_status.json"), JSON.stringify(errStatus, null, 2));
+    return errStatus;
   }
+};
+
+// Run startup check
+(async () => {
+  await runSupabaseSelfTest();
 })();
 
 // Local JSON Fallback Storage Helpers for system_users and system_settings
@@ -1418,6 +1464,70 @@ app.post("/api/settings", async (req, res) => {
     localSettings.push(setting);
     saveLocalSettings(localSettings);
     return res.json({ success: true, local: true });
+  }
+});
+
+// 7. Supabase Database Custom Configuration Endpoints
+app.get("/api/config/supabase", async (req, res) => {
+  try {
+    const customConfig = getCustomSupabaseConfig() || {};
+    let status = { success: false, error: "Chưa kiểm tra kết nối" };
+    const statusPath = path.join(process.cwd(), "db_status.json");
+    if (fs.existsSync(statusPath)) {
+      try {
+        status = JSON.parse(fs.readFileSync(statusPath, "utf-8"));
+      } catch (e) {}
+    }
+    return res.json({
+      config: {
+        url: customConfig.url || "",
+        anonKey: customConfig.anonKey || "",
+        serviceRoleKey: customConfig.serviceRoleKey ? "••••••••••••••••••••••••" : "",
+        region: customConfig.region || "sydney"
+      },
+      status
+    });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/config/supabase", async (req, res) => {
+  try {
+    const { url, serviceRoleKey, anonKey, region } = req.body;
+    
+    // Read previous config to avoid wiping out the key if user submitted masked dots
+    const prevConfig = getCustomSupabaseConfig() || {};
+    let finalKey = serviceRoleKey;
+    if (serviceRoleKey === "••••••••••••••••••••••••" || !serviceRoleKey) {
+      finalKey = prevConfig.serviceRoleKey || "";
+    }
+
+    const newConfig = {
+      url: url ? url.trim() : "",
+      serviceRoleKey: finalKey ? finalKey.trim() : "",
+      anonKey: anonKey ? anonKey.trim() : "",
+      region: region || "custom"
+    };
+
+    if (!newConfig.url) {
+      // If URL is empty, delete custom config file to revert to defaults
+      if (fs.existsSync(CONFIG_FILE)) {
+        fs.unlinkSync(CONFIG_FILE);
+      }
+    } else {
+      fs.writeFileSync(CONFIG_FILE, JSON.stringify(newConfig, null, 2), "utf-8");
+    }
+
+    // Run connection test
+    const status = await runSupabaseSelfTest();
+
+    return res.json({
+      success: status.success,
+      status
+    });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message });
   }
 });
 
