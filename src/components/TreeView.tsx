@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
-import { Users, Eye, HelpCircle, User, Award, ArrowRight, Heart, RefreshCw } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Users, Eye, HelpCircle, User, Award, ArrowRight, Heart, RefreshCw, Download, FileDown } from 'lucide-react';
 import { FamilyMember } from '../types';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 interface TreeViewProps {
   members: FamilyMember[];
@@ -13,6 +15,72 @@ export default function TreeView({ members, onSyncAll, currentUser, onOpenLogin 
   const [selectedMember, setSelectedMember] = useState<FamilyMember | null>(null);
   const [branchFilter, setBranchFilter] = useState<string>('all');
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const treeContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleExportAsImage = async () => {
+    if (!treeContainerRef.current) return;
+    setIsExporting(true);
+    try {
+      const element = treeContainerRef.current;
+      
+      const canvas = await html2canvas(element, {
+        useCORS: true,
+        scale: 2, // High resolution
+        backgroundColor: '#ffffff',
+        logging: false,
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.download = `cay-gia-pha-dong-ho-nghiem-${branchFilter}.png`;
+      link.href = imgData;
+      link.click();
+    } catch (err: any) {
+      console.error('Lỗi khi tải ảnh sơ đồ:', err);
+      alert('Không thể xuất ảnh sơ đồ: ' + err.message);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportAsPDF = async () => {
+    if (!treeContainerRef.current) return;
+    setIsExporting(true);
+    try {
+      const element = treeContainerRef.current;
+      
+      const canvas = await html2canvas(element, {
+        useCORS: true,
+        scale: 2, // High resolution
+        backgroundColor: '#ffffff',
+        logging: false
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      
+      // Calculate dimensions in mm
+      const pdfWidth = 297; // Horizontal width of A4 in mm
+      const pdfHeight = (imgHeight * pdfWidth) / imgWidth;
+      
+      const orientation = pdfWidth > pdfHeight ? 'l' : 'p';
+      const pdf = new jsPDF({
+        orientation: orientation,
+        unit: 'mm',
+        format: [pdfWidth, Math.max(pdfHeight, 210)]
+      });
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`cay-gia-pha-dong-ho-nghiem-${branchFilter}.pdf`);
+    } catch (err: any) {
+      console.error('Lỗi khi tải PDF sơ đồ:', err);
+      alert('Không thể xuất sơ đồ PDF: ' + err.message);
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   // Action: Direct Manual Sync current UI members list to server
   const handleManualSyncAll = async () => {
@@ -88,6 +156,30 @@ export default function TreeView({ members, onSyncAll, currentUser, onOpenLogin 
               <span>Đồng Bộ Tất Cả</span>
             </button>
 
+            {/* Download Image Button */}
+            <button
+              type="button"
+              onClick={handleExportAsImage}
+              disabled={isExporting}
+              className="px-3 py-2 bg-[#8b5a2b] hover:bg-[#704822] text-white text-xs font-bold rounded-lg transition flex items-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-50"
+              title="Tải sơ đồ phả hệ dạng hình ảnh chất lượng cao (PNG)"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Tải Ảnh Sơ Đồ</span>
+            </button>
+
+            {/* Download PDF Button */}
+            <button
+              type="button"
+              onClick={handleExportAsPDF}
+              disabled={isExporting}
+              className="px-3 py-2 bg-[#b85c38] hover:bg-[#9c4d2e] text-white text-xs font-bold rounded-lg transition flex items-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-50"
+              title="Tải sơ đồ phả hệ định dạng tài liệu PDF"
+            >
+              <FileDown className="w-3.5 h-3.5" />
+              <span>Tải PDF Sơ Đồ</span>
+            </button>
+
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-gray-400 uppercase">Lọc theo Chi:</span>
               <select
@@ -125,7 +217,7 @@ export default function TreeView({ members, onSyncAll, currentUser, onOpenLogin 
 
         {/* Tree Container with horizontal scroll */}
         <div className="w-full overflow-x-auto pb-6">
-          <div className="min-w-[1100px] flex flex-col items-center">
+          <div ref={treeContainerRef} className="min-w-[1100px] flex flex-col items-center bg-[#fdfbf7] p-8 rounded-2xl border border-[#f4f0e6]">
             
             {/* ĐỜI 15: Cụ Cố Nghiêm Điều (Chu) & Cụ Bà Lùn */}
             <div className="flex flex-col items-center mb-10">

@@ -958,21 +958,18 @@ export default function AdminView({
                   </div>
                 </div>
 
-                {/* Generation */}
+                {/* Step Child Toggle */}
                 <div>
-                  <label className="block font-bold text-[#6b4724] mb-1">Thế hệ đời thứ:</label>
-                  <select
-                    value={generation}
-                    onChange={(e) => setGeneration(Number(e.target.value))}
-                    className="w-full p-2 border border-[#d6b583] rounded bg-white focus:outline-none focus:ring-2 focus:ring-[#b8956b]"
-                  >
-                    <option value={15}>Đời thứ 15 (Cụ tổ)</option>
-                    <option value={16}>Đời thứ 16</option>
-                    <option value={17}>Đời thứ 17</option>
-                    <option value={18}>Đời thứ 18</option>
-                    <option value={19}>Đời thứ 19 (Cháu cố)</option>
-                    <option value={20}>Đời thứ 20</option>
-                  </select>
+                  <label className="block font-bold text-[#6b4724] mb-1">Mối quan hệ con riêng:</label>
+                  <label className="flex items-center gap-1.5 font-semibold text-[#8b5a2b] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isStepChild}
+                      onChange={(e) => setIsStepChild(e.target.checked)}
+                      className="w-4 h-4 text-[#8b5a2b] border-[#d6b583] rounded focus:ring-[#b8956b] accent-[#8b5a2b]"
+                    />
+                    Con riêng của Chồng/Vợ
+                  </label>
                 </div>
 
                 {/* Branch */}
@@ -989,17 +986,21 @@ export default function AdminView({
                   </select>
                 </div>
 
-                {/* Deceased Toggle */}
+                {/* Generation */}
                 <div>
-                  <label className="block font-bold text-[#6b4724] mb-1">Trạng thái sống:</label>
-                  <label className="flex items-center gap-1.5 font-semibold">
-                    <input
-                      type="checkbox"
-                      checked={isDeceased}
-                      onChange={(e) => setIsDeceased(e.target.checked)}
-                    />
-                    Đã khuất (Tạ thế) †
-                  </label>
+                  <label className="block font-bold text-[#6b4724] mb-1">Thế hệ đời thứ:</label>
+                  <select
+                    value={generation}
+                    onChange={(e) => setGeneration(Number(e.target.value))}
+                    className="w-full p-2 border border-[#d6b583] rounded bg-white focus:outline-none focus:ring-2 focus:ring-[#b8956b]"
+                  >
+                    <option value={15}>Đời thứ 15 (Cụ tổ)</option>
+                    <option value={16}>Đời thứ 16</option>
+                    <option value={17}>Đời thứ 17</option>
+                    <option value={18}>Đời thứ 18</option>
+                    <option value={19}>Đời thứ 19 (Cháu cố)</option>
+                    <option value={20}>Đời thứ 20</option>
+                  </select>
                 </div>
 
                 {/* Birth Year */}
@@ -1026,6 +1027,20 @@ export default function AdminView({
                       </span>
                     )}
                   </div>
+                </div>
+
+                {/* Deceased Toggle */}
+                <div>
+                  <label className="block font-bold text-[#6b4724] mb-1">Trạng thái sống:</label>
+                  <label className="flex items-center gap-1.5 font-semibold">
+                    <input
+                      type="checkbox"
+                      checked={isDeceased}
+                      onChange={(e) => setIsDeceased(e.target.checked)}
+                      className="w-4 h-4"
+                    />
+                    Đã khuất (Tạ thế) †
+                  </label>
                 </div>
 
                 {/* Death Year & Detailed Info */}
