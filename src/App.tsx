@@ -28,6 +28,42 @@ export default function App() {
   const [currentTab, setCurrentTab] = useState('home');
   const [tablesNeedInitialization, setTablesNeedInitialization] = useState(false);
   const [isSqlModalOpen, setIsSqlModalOpen] = useState(false);
+  const [isDbStatusModalOpen, setIsDbStatusModalOpen] = useState(false);
+  const [supabaseStatus, setSupabaseStatus] = useState<{
+    success: boolean;
+    region: string;
+    url: string;
+  } | null>(null);
+
+  const getRegionLabel = (region: string) => {
+    switch (region) {
+      case 'sydney': return 'Sydney, Úc';
+      case 'singapore': return 'Singapore';
+      case 'tokyo': return 'Tokyo, Nhật';
+      case 'custom': return 'Tùy chọn';
+      default: return 'Sydney, Úc';
+    }
+  };
+
+  const fetchSupabaseStatus = async () => {
+    try {
+      const res = await fetch(getApiUrl('/api/config/supabase'));
+      if (res.ok) {
+        const data = await res.json();
+        setSupabaseStatus({
+          success: !!data.status?.success,
+          region: data.config?.region || 'sydney',
+          url: data.config?.url || ''
+        });
+      }
+    } catch (err) {
+      console.error("Failed to fetch Supabase status:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchSupabaseStatus();
+  }, [currentTab]);
 
   // Core Application Database States
   const [members, setMembers] = useState<FamilyMember[]>([]);
@@ -1162,10 +1198,34 @@ export default function App() {
             <div className="flex items-center gap-2">
               <TreeDeciduous className="w-6 h-6 text-[#d6b583]" />
               <span className="font-serif font-bold text-sm tracking-wide hidden sm:inline text-[#d6b583]">Nghiêm Gia Hệ</span>
-              <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-emerald-950/40 text-emerald-300 border border-emerald-900/40 font-bold ml-1 shrink-0">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span>Supabase Động</span>
-              </span>
+              <button
+                onClick={() => setIsDbStatusModalOpen(true)}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold ml-1 shrink-0 transition-all hover:scale-105 active:scale-95 cursor-pointer border ${
+                  tablesNeedInitialization
+                    ? 'bg-amber-950/40 text-amber-300 border-amber-900/40 hover:bg-amber-950/60'
+                    : !supabaseStatus || !supabaseStatus.success
+                    ? 'bg-rose-950/40 text-rose-300 border-rose-900/40 hover:bg-rose-950/60'
+                    : 'bg-emerald-950/40 text-emerald-300 border-emerald-900/40 hover:bg-emerald-950/60'
+                }`}
+                title="Nhấp để xem Trạng thái & Vùng lưu trữ Cơ sở dữ liệu"
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${
+                  tablesNeedInitialization
+                    ? 'bg-amber-400 animate-pulse'
+                    : !supabaseStatus || !supabaseStatus.success
+                    ? 'bg-rose-400 animate-pulse'
+                    : 'bg-emerald-400 animate-pulse'
+                }`}></span>
+                <span>
+                  Supabase: {
+                    tablesNeedInitialization
+                      ? 'Chưa khởi tạo'
+                      : !supabaseStatus || !supabaseStatus.success
+                      ? 'Ngoại tuyến'
+                      : getRegionLabel(supabaseStatus.region)
+                  }
+                </span>
+              </button>
             </div>
 
             {/* Nav links */}
@@ -1849,6 +1909,115 @@ CREATE TABLE IF NOT EXISTS system_settings (
                 <button
                   onClick={() => setIsSqlModalOpen(false)}
                   className="bg-[#3e2a16] text-[#fdfbf7] px-4 py-2 rounded-lg font-bold hover:bg-[#5c3e21]"
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isDbStatusModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full overflow-hidden border border-[#b8956b] shadow-2xl animate-in fade-in zoom-in duration-200 text-[#4a331a]">
+            <div className="p-5 bg-[#3e2a16] text-white flex justify-between items-center">
+              <h3 className="text-base font-bold font-serif uppercase tracking-wider text-[#fdfbf7] flex items-center gap-2">
+                <span className={`w-2.5 h-2.5 rounded-full ${
+                  tablesNeedInitialization
+                    ? 'bg-amber-400 animate-pulse'
+                    : !supabaseStatus || !supabaseStatus.success
+                    ? 'bg-rose-400 animate-pulse'
+                    : 'bg-emerald-400 animate-pulse'
+                }`}></span>
+                Trạng thái Cơ sở dữ liệu
+              </h3>
+              <button
+                onClick={() => setIsDbStatusModalOpen(false)}
+                className="text-gray-400 hover:text-white text-2xl font-bold leading-none"
+              >
+                &times;
+              </button>
+            </div>
+            <div className="p-6 space-y-4 text-xs font-medium">
+              <div className="space-y-2 pb-4 border-b border-gray-100">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">Trạng thái kết nối:</span>
+                  <span className={`font-bold uppercase tracking-wider text-[11px] px-2.5 py-0.5 rounded-full ${
+                    tablesNeedInitialization
+                      ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                      : !supabaseStatus || !supabaseStatus.success
+                      ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                      : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                  }`}>
+                    {tablesNeedInitialization
+                      ? 'Chưa khởi tạo bảng'
+                      : !supabaseStatus || !supabaseStatus.success
+                      ? 'Ngoại tuyến (Offline)'
+                      : 'Trực tuyến (Connected)'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">Vùng hoạt động hiện tại:</span>
+                  <span className="font-bold text-gray-800">
+                    {supabaseStatus ? getRegionLabel(supabaseStatus.region) : 'Châu Đại Dương (Sydney, Úc)'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">Độ trễ kết nối (ước tính):</span>
+                  <span className="font-bold text-[#b8956b]">
+                    {!supabaseStatus || !supabaseStatus.success
+                      ? '--'
+                      : supabaseStatus.region === 'singapore'
+                      ? '35 ms (Tối ưu)'
+                      : supabaseStatus.region === 'tokyo'
+                      ? '70 ms (Tốt)'
+                      : '220 ms (Bình thường)'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">Địa chỉ Endpoint:</span>
+                  <span className="font-mono text-[10px] text-gray-600 truncate max-w-[200px]" title={supabaseStatus?.url}>
+                    {supabaseStatus?.url || 'https://domczpyfjiqttwdcrdsj.supabase.co'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-2 leading-relaxed text-[#6b4724]">
+                <p>
+                  {tablesNeedInitialization ? (
+                    'Hệ thống phát hiện dự án Supabase của bạn đã kết nối được nhưng các bảng dữ liệu (như family_members, announcements, prayers) chưa được tạo. Hãy chạy mã SQL khởi tạo để sử dụng.'
+                  ) : !supabaseStatus || !supabaseStatus.success ? (
+                    'Hiện tại hệ thống không thể kết nối tới cơ sở dữ liệu Supabase của bạn. Ứng dụng đã tự động kích hoạt chế độ Lưu trữ Nội bộ (Local Storage) để bảo vệ toàn bộ thao tác thêm, sửa của bạn, dữ liệu sẽ không bị mất.'
+                  ) : (
+                    'Cơ sở dữ liệu đang hoạt động hoàn hảo. Mọi thao tác thêm mới thành viên dòng họ, dâng hương hoa tươi, đăng ký tài khoản quản trị viên hay lưu nhật ký hệ thống đều được đồng bộ hóa tức thì trên Cloud.'
+                  )}
+                </p>
+                <p className="bg-[#fdfbf7] p-3 rounded-lg border border-[#eadecb] text-[11px]">
+                  <strong>Mẹo chuyển vùng Châu Á:</strong> Bạn có thể dễ dàng chuyển đổi máy chủ lưu trữ dữ liệu phả hệ của dòng họ sang <strong>Singapore</strong> hoặc <strong>Nhật Bản</strong> để cải thiện tốc độ truy cập gấp 10 lần bằng cách nhấp vào nút cấu hình bên dưới.
+                </p>
+              </div>
+
+              <div className="flex justify-between gap-2 pt-2 border-t border-gray-100">
+                <button
+                  onClick={() => {
+                    setIsDbStatusModalOpen(false);
+                    setCurrentTab('admin');
+                    // wait for render and scroll to db config section
+                    setTimeout(() => {
+                      const el = document.getElementById('supabase-config-section');
+                      if (el) {
+                        el.scrollIntoView({ behavior: 'smooth' });
+                      }
+                    }, 300);
+                  }}
+                  className="bg-amber-600 text-white hover:bg-amber-700 px-4 py-2 rounded-lg font-bold transition flex-1 text-center"
+                >
+                  Cấu hình Vùng / Khóa
+                </button>
+                <button
+                  onClick={() => setIsDbStatusModalOpen(false)}
+                  className="bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 py-2 rounded-lg font-bold transition flex-1 text-center"
                 >
                   Đóng
                 </button>

@@ -112,6 +112,9 @@ const getSupabaseClient = () => {
     key = fallbackKey;
   }
 
+  // Safety log to track key being used
+  console.log(`[getSupabaseClient] URL: ${url}, Key length: ${key?.length}, Key preview: ${key ? key.slice(0, 15) + "..." + key.slice(-5) : "null"}`);
+
   return createClient(url, key, {
     auth: {
       persistSession: false,

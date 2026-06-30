@@ -1037,7 +1037,7 @@ export default function AdminView({
               </div>
             </div>
 
-            <div className="bg-[#fdfbf7] p-4 rounded-xl border border-[#eadecb] space-y-4">
+            <div id="supabase-config-section" className="bg-[#fdfbf7] p-4 rounded-xl border border-[#eadecb] space-y-4">
               <h3 className="text-sm font-bold text-[#6b4724] font-serif uppercase tracking-wider flex items-center gap-1.5 border-b border-[#eadecb] pb-2">
                 <Database className="w-4 h-4 text-[#b8956b]" />
                 Cấu hình Vùng Cơ sở dữ liệu Supabase (Chuyển vùng Châu Á)
