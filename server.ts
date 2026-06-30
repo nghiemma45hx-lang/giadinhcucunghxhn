@@ -1001,7 +1001,7 @@ Yêu cầu kỹ thuật:
 // 1. Members Endpoints
 const cleanMemberForDb = (m: any) => {
   if (!m) return m;
-  const { spouseIds, deathDateSolar, deathTime, deathDateLunar, avatar, ...rest } = m;
+  const { spouseIds, deathDateSolar, deathTime, deathDateLunar, avatar, isStepChild, ...rest } = m;
   return rest;
 };
 

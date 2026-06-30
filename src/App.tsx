@@ -1345,6 +1345,7 @@ ALTER TABLE family_members ADD COLUMN IF NOT EXISTS "deathDateSolar" TEXT;
 ALTER TABLE family_members ADD COLUMN IF NOT EXISTS "deathTime" TEXT;
 ALTER TABLE family_members ADD COLUMN IF NOT EXISTS "deathDateLunar" TEXT;
 ALTER TABLE family_members ADD COLUMN IF NOT EXISTS avatar TEXT;
+ALTER TABLE family_members ADD COLUMN IF NOT EXISTS "isStepChild" BOOLEAN DEFAULT false;
 
 -- 2. Tạo bảng announcements
 CREATE TABLE IF NOT EXISTS announcements (
@@ -1424,6 +1425,7 @@ ALTER TABLE family_members ADD COLUMN IF NOT EXISTS "deathDateSolar" TEXT;
 ALTER TABLE family_members ADD COLUMN IF NOT EXISTS "deathTime" TEXT;
 ALTER TABLE family_members ADD COLUMN IF NOT EXISTS "deathDateLunar" TEXT;
 ALTER TABLE family_members ADD COLUMN IF NOT EXISTS avatar TEXT;
+ALTER TABLE family_members ADD COLUMN IF NOT EXISTS "isStepChild" BOOLEAN DEFAULT false;
 
 -- 2. Tạo bảng announcements
 CREATE TABLE IF NOT EXISTS announcements (

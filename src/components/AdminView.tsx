@@ -67,6 +67,7 @@ export default function AdminView({
   const [address, setAddress] = useState('');
   const [phone, setPhone] = useState('');
   const [avatar, setAvatar] = useState('');
+  const [isStepChild, setIsStepChild] = useState(false);
 
   const [originalParentId, setOriginalParentId] = useState('');
   const [originalMotherId, setOriginalMotherId] = useState('');
@@ -129,6 +130,7 @@ export default function AdminView({
     setAddress('');
     setPhone('');
     setAvatar('');
+    setIsStepChild(false);
     setOriginalParentId('');
     setOriginalMotherId('');
     setOriginalSpouseId('');
@@ -170,6 +172,7 @@ export default function AdminView({
     setAddress(member.address || '');
     setPhone(member.phone || '');
     setAvatar(member.avatar || '');
+    setIsStepChild(member.isStepChild || false);
     setOriginalParentId(member.parentId || '');
     setOriginalMotherId(member.motherId || '');
     setOriginalSpouseId(member.spouseId || '');
@@ -210,6 +213,7 @@ export default function AdminView({
     setAddress(targetMember.address || '');
     setPhone(targetMember.phone || '');
     setAvatar(targetMember.avatar || '');
+    setIsStepChild(targetMember.isStepChild || false);
     setOriginalParentId(targetMember.parentId || '');
     setOriginalMotherId(targetMember.motherId || '');
     setOriginalSpouseId(targetMember.spouseId || '');
@@ -277,6 +281,7 @@ export default function AdminView({
       address: address.trim() || undefined,
       phone: phone.trim() || undefined,
       avatar: avatar.trim() || undefined,
+      isStepChild: isStepChild || undefined,
     };
 
     if (editingMember) {

@@ -21,6 +21,7 @@ export interface FamilyMember {
   deathTime?: string;
   deathDateLunar?: string;
   avatar?: string;
+  isStepChild?: boolean;
 }
 
 export interface AltarPrayer {
