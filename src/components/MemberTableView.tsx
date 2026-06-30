@@ -962,7 +962,7 @@ export default function MemberTableView({
           <div class="container">
             <div class="header">
               <h1>BIỂU MẪU BIÊN SOẠN GIA PHẢ</h1>
-              <p>Hội Đồng Gia Tộc Nghiêm Cung — Hòa Xá, Ứng Hòa, Hà Nội</p>
+              <p>Gia Đình Cụ Nghiêm Cung — Hòa Xá, Ứng Hòa, Hà Nội</p>
               <p>Mẫu chuẩn số hóa sơ đồ cây phả hệ trực tuyến</p>
             </div>
 
@@ -1264,7 +1264,7 @@ export default function MemberTableView({
         <body>
           <div class="cover">
             <h1>PHẢ HỆ CHI TIẾT DÒNG HỌ NGHIÊM</h1>
-            <h2>Hội Đồng Gia Tộc Nghiêm Cung - Hòa Xá, Ứng Hòa, Hà Nội</h2>
+            <h2>Gia Đình Cụ Nghiêm Cung - Hòa Xá, Ứng Hòa, Hà Nội</h2>
             <p><strong>Ngày xuất bản:</strong> ${new Date().toLocaleDateString('vi-VN')}</p>
             <p><strong>Số lượng thành viên:</strong> ${members.length} người | <strong>Số thế hệ:</strong> ${Object.keys(genGroups).length} đời</p>
             <div class="quote">
@@ -1381,7 +1381,7 @@ export default function MemberTableView({
         <html>
         <head>
           <meta charset="utf-8">
-          <title>Gia Phả Số Hóa Họ Nghiêm Cung - Hòa Xá</title>
+          <title>Gia Phả Gia Đình Cụ Nghiêm Cung - Hòa Xá</title>
           <style>
             @media print {
               body { margin: 0; padding: 0; background: white; font-size: 10pt; }
@@ -1531,8 +1531,8 @@ export default function MemberTableView({
 
           <div class="container">
             <div class="header">
-              <h1>GIA PHẢ SỐ HÓA HỌ NGHIÊM</h1>
-              <p>Hội Đồng Gia Tộc Nghiêm Cung — Hòa Xá, Ứng Hòa, Hà Nội</p>
+              <h1>GIA PHẢ GIA ĐÌNH CỤ NGHIÊM CUNG</h1>
+              <p>Gia Đình Cụ Nghiêm Cung — Hòa Xá, Ứng Hòa, Hà Nội</p>
               <p>Ngày trích lục hệ thống: ${new Date().toLocaleDateString('vi-VN')} | Tổng số: ${members.length} thành viên</p>
             </div>
 

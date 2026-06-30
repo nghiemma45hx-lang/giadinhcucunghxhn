@@ -599,7 +599,7 @@ app.get("/api/templates/download", (req, res) => {
           <div class="container">
             <div class="header">
               <h1>BIỂU MẪU BIÊN SOẠN GIA PHẢ</h1>
-              <p>Hội Đồng Gia Tộc Nghiêm Cung — Hòa Xá, Ứng Hòa, Hà Nội</p>
+              <p>Gia Đình Cụ Nghiêm Cung — Hòa Xá, Ứng Hòa, Hà Nội</p>
               <p>Mẫu chuẩn số hóa sơ đồ cây phả hệ trực tuyến</p>
             </div>
 
