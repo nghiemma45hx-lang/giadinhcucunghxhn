@@ -29,6 +29,31 @@ export default function TreeView({ members, onSyncAll, currentUser, onOpenLogin 
         scale: 2, // High resolution
         backgroundColor: '#ffffff',
         logging: false,
+        onclone: (clonedDoc) => {
+          // Fix oklch and oklab colors in style tags to prevent html2canvas from crashing
+          const styleElements = clonedDoc.getElementsByTagName('style');
+          for (let i = 0; i < styleElements.length; i++) {
+            const style = styleElements[i];
+            if (style.innerHTML) {
+              style.innerHTML = style.innerHTML
+                .replace(/oklch\([^)]+\)/g, 'rgb(184, 149, 107)')
+                .replace(/oklab\([^)]+\)/g, 'rgb(184, 149, 107)');
+            }
+          }
+
+          // Fix oklch and oklab in inline styles
+          const allElements = clonedDoc.getElementsByTagName('*');
+          for (let i = 0; i < allElements.length; i++) {
+            const el = allElements[i] as HTMLElement;
+            if (el.style && el.style.cssText) {
+              if (el.style.cssText.includes('oklch') || el.style.cssText.includes('oklab')) {
+                el.style.cssText = el.style.cssText
+                  .replace(/oklch\([^)]+\)/g, 'rgb(184, 149, 107)')
+                  .replace(/oklab\([^)]+\)/g, 'rgb(184, 149, 107)');
+              }
+            }
+          }
+        }
       });
       
       const imgData = canvas.toDataURL('image/png');
@@ -54,7 +79,32 @@ export default function TreeView({ members, onSyncAll, currentUser, onOpenLogin 
         useCORS: true,
         scale: 2, // High resolution
         backgroundColor: '#ffffff',
-        logging: false
+        logging: false,
+        onclone: (clonedDoc) => {
+          // Fix oklch and oklab colors in style tags to prevent html2canvas from crashing
+          const styleElements = clonedDoc.getElementsByTagName('style');
+          for (let i = 0; i < styleElements.length; i++) {
+            const style = styleElements[i];
+            if (style.innerHTML) {
+              style.innerHTML = style.innerHTML
+                .replace(/oklch\([^)]+\)/g, 'rgb(184, 149, 107)')
+                .replace(/oklab\([^)]+\)/g, 'rgb(184, 149, 107)');
+            }
+          }
+
+          // Fix oklch and oklab in inline styles
+          const allElements = clonedDoc.getElementsByTagName('*');
+          for (let i = 0; i < allElements.length; i++) {
+            const el = allElements[i] as HTMLElement;
+            if (el.style && el.style.cssText) {
+              if (el.style.cssText.includes('oklch') || el.style.cssText.includes('oklab')) {
+                el.style.cssText = el.style.cssText
+                  .replace(/oklch\([^)]+\)/g, 'rgb(184, 149, 107)')
+                  .replace(/oklab\([^)]+\)/g, 'rgb(184, 149, 107)');
+              }
+            }
+          }
+        }
       });
       
       const imgData = canvas.toDataURL('image/png');
