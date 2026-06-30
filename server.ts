@@ -1240,6 +1240,19 @@ app.post("/api/prayers", async (req, res) => {
   }
 });
 
+app.delete("/api/prayers/:id", async (req, res) => {
+  try {
+    const supabase = getSupabaseClient();
+    const { id } = req.params;
+    const { error } = await supabase.from("prayers").delete().eq("id", id);
+    if (error) throw error;
+    return res.json({ success: true });
+  } catch (error: any) {
+    console.error("DELETE /api/prayers/:id error:", error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 // 4. System Logs Endpoints
 app.get("/api/logs", async (req, res) => {
   try {

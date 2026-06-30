@@ -81,8 +81,26 @@ export default function App() {
             setTablesNeedInitialization(true);
           }
           if (json.data) {
-            setPrayers(json.data);
-            localStorage.setItem('gia_pha_prayers', JSON.stringify(json.data));
+            const cleaned = json.data.filter((p: any) => {
+              const isTuandefault = p.sender === 'Nghiêm Xuân Tuấn' && p.message.includes('Cụ Nghiêm Cung');
+              const isThanhdefault = p.sender === 'Nghiêm Thị Thanh' && p.message.includes('dâng đĩa hoa tươi');
+              return !isTuandefault && !isThanhdefault;
+            });
+            setPrayers(cleaned);
+            localStorage.setItem('gia_pha_prayers', JSON.stringify(cleaned));
+            
+            // Clean up from database proactively if they exist
+            json.data.forEach(async (p: any) => {
+              const isTuandefault = p.sender === 'Nghiêm Xuân Tuấn' && p.message.includes('Cụ Nghiêm Cung');
+              const isThanhdefault = p.sender === 'Nghiêm Thị Thanh' && p.message.includes('dâng đĩa hoa tươi');
+              if (isTuandefault || isThanhdefault) {
+                try {
+                  await fetch(`/api/prayers/${p.id}`, { method: 'DELETE' });
+                } catch (e) {
+                  console.warn("Failed proactive delete", e);
+                }
+              }
+            });
           }
         }
 
@@ -143,25 +161,16 @@ export default function App() {
         if (storedAnnouncements) setAnnouncements(JSON.parse(storedAnnouncements));
         else setAnnouncements(initialAnnouncements);
 
-        if (storedPrayers) setPrayers(JSON.parse(storedPrayers));
-        else {
-          const defaultPrayers: AltarPrayer[] = [
-            {
-              id: 'p-1',
-              sender: 'Nghiêm Xuân Tuấn',
-              message: 'thành tâm thắp nén tâm hương trầm kính dâng hương hồn Cụ Nghiêm Cung và cụ cố Nghiêm Điều cầu mong gia tộc thịnh đạt, gia quyến bình an.',
-              timestamp: '2026-06-28 20:15',
-              offeringType: 'incense'
-            },
-            {
-              id: 'p-2',
-              sender: 'Nghiêm Thị Thanh',
-              message: 'dâng đĩa hoa tươi quả ngọt kính dâng Tiên tổ tiên linh mong hai cụ che chở con cháu học tập tiến bộ.',
-              timestamp: '2026-06-29 09:30',
-              offeringType: 'flower'
-            }
-          ];
-          setPrayers(defaultPrayers);
+        if (storedPrayers) {
+          const loaded = JSON.parse(storedPrayers);
+          const cleaned = loaded.filter((p: any) => {
+            const isTuandefault = p.sender === 'Nghiêm Xuân Tuấn' && p.message.includes('Cụ Nghiêm Cung');
+            const isThanhdefault = p.sender === 'Nghiêm Thị Thanh' && p.message.includes('dâng đĩa hoa tươi');
+            return !isTuandefault && !isThanhdefault;
+          });
+          setPrayers(cleaned);
+        } else {
+          setPrayers([]);
         }
 
         if (storedLogs) setLogs(JSON.parse(storedLogs));
@@ -494,6 +503,18 @@ export default function App() {
       });
     } catch (err) {
       console.error("Failed to save prayer to Supabase:", err);
+    }
+  };
+
+  const handleDeletePrayer = async (id: string) => {
+    const updated = prayers.filter(p => p.id !== id);
+    savePrayers(updated);
+    try {
+      await fetch(`/api/prayers/${id}`, {
+        method: 'DELETE'
+      });
+    } catch (err) {
+      console.error("Failed to delete prayer from Supabase:", err);
     }
   };
 
@@ -1185,7 +1206,13 @@ export default function App() {
             {currentTab === 'member-list' && <MemberListView members={members} />}
 
             {currentTab === 'memorial' && (
-              <MemorialView members={members} prayers={prayers} onAddPrayer={handleAddPrayer} />
+              <MemorialView 
+                members={members} 
+                prayers={prayers} 
+                onAddPrayer={handleAddPrayer} 
+                onDeletePrayer={handleDeletePrayer}
+                currentUser={currentUser}
+              />
             )}
 
             {currentTab === 'statistics' && <StatisticsView members={members} />}

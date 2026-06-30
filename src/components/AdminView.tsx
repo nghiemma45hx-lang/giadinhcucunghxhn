@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Settings, PlusCircle, Trash2, Edit2, Users, Bell, Activity, Save, X, Plus, Image, Key, Shield } from 'lucide-react';
 // @ts-ignore
-import { getLunarDate } from 'vietnamese-lunar-calendar';
+import { LunarDate } from 'vietnamese-lunar-calendar';
 import { FamilyMember, Announcement, SystemLog, SystemUser } from '../types';
 import { ImageUploader } from './ImageUploader';
 import { SearchableSelect } from './SearchableSelect';
@@ -336,10 +336,10 @@ export default function AdminView({
     if (isNaN(d) || isNaN(m) || isNaN(y)) return null;
     try {
       // @ts-ignore
-      const res = getLunarDate(d, m, y);
-      if (res && res.day && res.month && res.year) {
+      const res = new LunarDate(y, m, d);
+      if (res && res.date && res.month && res.year) {
         const canChiYear = getCanChi(String(res.year));
-        return `ngày ${res.day} tháng ${res.month}${res.leap ? ' (nhuận)' : ''} năm ${canChiYear}`;
+        return `ngày ${res.date} tháng ${res.month}${res.isLeap ? ' (nhuận)' : ''} năm ${canChiYear}`;
       }
     } catch (e) {
       console.error(e);

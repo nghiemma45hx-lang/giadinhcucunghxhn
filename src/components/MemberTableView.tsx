@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Table, Calendar, MapPin, Phone, User, Award, Search, ArrowUpDown, Shield, PlusCircle, Edit2, Trash2, X, Plus, Download, Upload, RefreshCw, FileSpreadsheet, FileJson, Check, Loader2, FileText } from 'lucide-react';
 // @ts-ignore
-import { getLunarDate } from 'vietnamese-lunar-calendar';
+import { LunarDate } from 'vietnamese-lunar-calendar';
 import * as XLSX from 'xlsx';
 import { FamilyMember } from '../types';
 
@@ -2091,10 +2091,10 @@ export default function MemberTableView({
     if (isNaN(d) || isNaN(m) || isNaN(y)) return null;
     try {
       // @ts-ignore
-      const res = getLunarDate(d, m, y);
-      if (res && res.day && res.month && res.year) {
+      const res = new LunarDate(y, m, d);
+      if (res && res.date && res.month && res.year) {
         const canChiYear = getCanChi(String(res.year));
-        return `ngày ${res.day} tháng ${res.month}${res.leap ? ' (nhuận)' : ''} năm ${canChiYear}`;
+        return `ngày ${res.date} tháng ${res.month}${res.isLeap ? ' (nhuận)' : ''} năm ${canChiYear}`;
       }
     } catch (e) {
       console.error(e);

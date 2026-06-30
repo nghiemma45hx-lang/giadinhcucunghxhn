@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { Flame, Sparkles, BookOpen, Heart, User, Clipboard, Check, Send, AlertCircle } from 'lucide-react';
+import { Flame, Sparkles, BookOpen, Heart, User, Clipboard, Check, Send, AlertCircle, Trash2 } from 'lucide-react';
 import { FamilyMember, AltarPrayer } from '../types';
 
 interface MemorialViewProps {
   members: FamilyMember[];
   prayers: AltarPrayer[];
   onAddPrayer: (sender: string, message: string, offeringType: 'incense' | 'candle' | 'flower' | 'none') => void;
+  onDeletePrayer?: (id: string) => void;
+  currentUser?: any;
 }
 
-export default function MemorialView({ members, prayers, onAddPrayer }: MemorialViewProps) {
+export default function MemorialView({ members, prayers, onAddPrayer, onDeletePrayer, currentUser }: MemorialViewProps) {
   const [senderName, setSenderName] = useState('');
   const [selectedAncestor, setSelectedAncestor] = useState('');
   const [customWish, setCustomWish] = useState('');
@@ -389,8 +391,25 @@ export default function MemorialView({ members, prayers, onAddPrayer }: Memorial
                   </p>
                 </div>
 
-                <div className="mt-4 pt-2 border-t border-dashed border-[#eadecb] text-[10px] text-gray-400 font-medium text-right">
-                  Vừa dâng lễ lúc: {pr.timestamp}
+                <div className="mt-4 pt-2 border-t border-dashed border-[#eadecb] flex justify-between items-center text-[10px] text-gray-400 font-medium">
+                  <div>
+                    {onDeletePrayer && (
+                      <button
+                        onClick={() => {
+                          if (confirm(`Bạn có chắc chắn muốn xóa lời tưởng niệm này của ${pr.sender}?`)) {
+                            onDeletePrayer(pr.id);
+                          }
+                        }}
+                        className="text-gray-400 hover:text-red-600 p-1 rounded-lg hover:bg-red-50 transition cursor-pointer"
+                        title="Xóa lời tưởng niệm"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    Vừa dâng lễ lúc: {pr.timestamp}
+                  </div>
                 </div>
               </div>
             ))}
