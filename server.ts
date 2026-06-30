@@ -91,7 +91,7 @@ const getSupabaseClient = () => {
   }
 
   const fallbackUrl = "https://domczpyfjiqttwdcrdsj.supabase.co";
-  const fallbackKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRvbWN6cHlmamlxdHR3ZGNyZHNqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjcwMTM5NCwiZXhwIjoyMDk4Mjc3Mzk0fQ.-2ksd7TQPy6hDPwE2S2OWUzWC0ws04FjecgL2lhRWf";
+  const fallbackKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRvbWN6cHlmamlxdHR3ZGNyZHNqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjcwMTM5NCwiZXhwIjoyMDk4Mjc3Mzk0fQ.-2ksd7TQPy6hDPwE2S2OWUzWC0ws04FjecgL2lhRWf0";
 
   const isCustomProject = url && url !== "MY_SUPABASE_URL" && url.startsWith("http") && !url.includes("domczpyfjiqttwdcrdsj.supabase.co");
 
@@ -109,7 +109,12 @@ const getSupabaseClient = () => {
     }
   } else {
     url = fallbackUrl;
-    key = fallbackKey;
+    // Use verified process.env.SUPABASE_SERVICE_ROLE_KEY if it exists and is valid JWT
+    if (key && key.startsWith("eyJ") && key.split(".").length === 3 && key !== "MY_SUPABASE_SERVICE_ROLE_KEY" && key !== "SUPABASE_SERVICE_ROLE_KEY") {
+      // Keep using verified key
+    } else {
+      key = fallbackKey;
+    }
   }
 
   return createClient(url, key, {
@@ -123,7 +128,7 @@ const getSupabaseClient = () => {
 const runSupabaseSelfTest = async () => {
   try {
     const customConfig = getCustomSupabaseConfig();
-    let rawKey = cleanEnvVar(process.env.SUPABASE_SERVICE_ROLE_KEY) || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRvbWN6cHlmamlxdHR3ZGNyZHNqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjcwMTM5NCwiZXhwIjoyMDk4Mjc3Mzk0fQ.-2ksd7TQPy6hDPwE2S2OWUzWC0ws04FjecgL2lhRWf";
+    let rawKey = cleanEnvVar(process.env.SUPABASE_SERVICE_ROLE_KEY) || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRvbWN6cHlmamlxdHR3ZGNyZHNqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjcwMTM5NCwiZXhwIjoyMDk4Mjc3Mzk0fQ.-2ksd7TQPy6hDPwE2S2OWUzWC0ws04FjecgL2lhRWf0";
     let url = cleanEnvVar(process.env.SUPABASE_URL) || "https://domczpyfjiqttwdcrdsj.supabase.co";
 
     if (customConfig && customConfig.url) {
