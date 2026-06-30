@@ -14,6 +14,16 @@ import StatisticsView from './components/StatisticsView';
 import AdminView from './components/AdminView';
 import { ImageUploader } from './components/ImageUploader';
 
+// Helper to construct dynamic API Backend URL to support any online host (like Vercel, Netlify, etc.)
+export const getApiUrl = (path: string): string => {
+  const storedUrl = localStorage.getItem('gia_pha_api_backend_url');
+  if (storedUrl && storedUrl.trim()) {
+    const base = storedUrl.trim().endsWith('/') ? storedUrl.trim().slice(0, -1) : storedUrl.trim();
+    return `${base}${path}`;
+  }
+  return path;
+};
+
 export default function App() {
   const [currentTab, setCurrentTab] = useState('home');
   const [tablesNeedInitialization, setTablesNeedInitialization] = useState(false);
@@ -58,11 +68,20 @@ export default function App() {
   const [showChangeConfirmPassword, setShowChangeConfirmPassword] = useState(false);
   const [changePasswordError, setChangePasswordError] = useState('');
 
+  // Auto-detect and set default API Backend URL when running on real server / localhost
+  useEffect(() => {
+    const hostname = window.location.hostname;
+    const isLocalOrContainer = hostname.includes('run.app') || hostname === 'localhost' || hostname === '127.0.0.1';
+    if (isLocalOrContainer) {
+      localStorage.setItem('gia_pha_api_backend_url', window.location.origin);
+    }
+  }, []);
+
   // Initialize and load from Supabase with localStorage fallbacks
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const resMembers = await fetch('/api/members');
+        const resMembers = await fetch(getApiUrl('/api/members'));
         if (resMembers.ok) {
           const json = await resMembers.json();
           if (json.tablesNeedInitialization) {
@@ -76,7 +95,7 @@ export default function App() {
           throw new Error("HTTP members error");
         }
 
-        const resAnn = await fetch('/api/announcements');
+        const resAnn = await fetch(getApiUrl('/api/announcements'));
         if (resAnn.ok) {
           const json = await resAnn.json();
           if (json.tablesNeedInitialization) {
@@ -88,7 +107,7 @@ export default function App() {
           }
         }
 
-        const resPrayers = await fetch('/api/prayers');
+        const resPrayers = await fetch(getApiUrl('/api/prayers'));
         if (resPrayers.ok) {
           const json = await resPrayers.json();
           if (json.tablesNeedInitialization) {
@@ -109,7 +128,7 @@ export default function App() {
               const isThanhdefault = p.sender === 'Nghiêm Thị Thanh' && p.message.includes('dâng đĩa hoa tươi');
               if (isTuandefault || isThanhdefault) {
                 try {
-                  await fetch(`/api/prayers/${p.id}`, { method: 'DELETE' });
+                  await fetch(getApiUrl(`/api/prayers/${p.id}`), { method: 'DELETE' });
                 } catch (e) {
                   console.warn("Failed proactive delete", e);
                 }
@@ -118,7 +137,7 @@ export default function App() {
           }
         }
 
-        const resLogs = await fetch('/api/logs');
+        const resLogs = await fetch(getApiUrl('/api/logs'));
         if (resLogs.ok) {
           const json = await resLogs.json();
           if (json.tablesNeedInitialization) {
@@ -132,7 +151,7 @@ export default function App() {
 
         // Fetch settings from database
         try {
-          const resSettings = await fetch('/api/settings');
+          const resSettings = await fetch(getApiUrl('/api/settings'));
           if (resSettings.ok) {
             const json = await resSettings.json();
             if (json.data && json.data.length > 0) {
@@ -149,7 +168,7 @@ export default function App() {
 
         // Fetch custom users from database
         try {
-          const resUsers = await fetch('/api/users');
+          const resUsers = await fetch(getApiUrl('/api/users'));
           if (resUsers.ok) {
             const json = await resUsers.json();
             if (json.data) {
@@ -254,7 +273,7 @@ export default function App() {
     saveLogs(updatedLogs);
 
     try {
-      await fetch('/api/logs', {
+      await fetch(getApiUrl('/api/logs'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newLog)
@@ -359,7 +378,7 @@ export default function App() {
       return next;
     });
     try {
-      await fetch('/api/settings', {
+      await fetch(getApiUrl('/api/settings'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key, value })
@@ -377,7 +396,7 @@ export default function App() {
       return next;
     });
     try {
-      await fetch('/api/users', {
+      await fetch(getApiUrl('/api/users'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(user)
@@ -395,7 +414,7 @@ export default function App() {
       return next;
     });
     try {
-      await fetch(`/api/users/${username}`, {
+      await fetch(getApiUrl(`/api/users/${username}`), {
         method: 'DELETE'
       });
       addLog(`thu hồi tài khoản quản trị: ${username}`, currentUser?.fullName || 'admin');
@@ -410,7 +429,7 @@ export default function App() {
     saveMembers(updated);
     
     try {
-      const res = await fetch('/api/members', {
+      const res = await fetch(getApiUrl('/api/members'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(member)
@@ -432,7 +451,7 @@ export default function App() {
     saveMembers(updated);
 
     try {
-      await fetch(`/api/members/${member.id}`, {
+      await fetch(getApiUrl(`/api/members/${member.id}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(member)
@@ -449,7 +468,7 @@ export default function App() {
     saveMembers(updated);
 
     try {
-      await fetch(`/api/members/${id}`, {
+      await fetch(getApiUrl(`/api/members/${id}`), {
         method: 'DELETE'
       });
     } catch (err) {
@@ -461,7 +480,7 @@ export default function App() {
   const handleSyncAll = async (newMembers: FamilyMember[]) => {
     saveMembers(newMembers);
     try {
-      const res = await fetch('/api/members/sync', {
+      const res = await fetch(getApiUrl('/api/members/sync'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newMembers)
@@ -520,7 +539,7 @@ export default function App() {
     saveAnnouncements(updated);
 
     try {
-      await fetch('/api/announcements', {
+      await fetch(getApiUrl('/api/announcements'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(ann)
@@ -536,7 +555,7 @@ export default function App() {
     saveAnnouncements(updated);
 
     try {
-      await fetch(`/api/announcements/${ann.id}`, {
+      await fetch(getApiUrl(`/api/announcements/${ann.id}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(ann)
@@ -553,7 +572,7 @@ export default function App() {
     saveAnnouncements(updated);
 
     try {
-      await fetch(`/api/announcements/${id}`, {
+      await fetch(getApiUrl(`/api/announcements/${id}`), {
         method: 'DELETE'
       });
     } catch (err) {
@@ -575,7 +594,7 @@ export default function App() {
     savePrayers(updated);
 
     try {
-      await fetch('/api/prayers', {
+      await fetch(getApiUrl('/api/prayers'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newPrayer)
@@ -589,7 +608,7 @@ export default function App() {
     const updated = prayers.filter(p => p.id !== id);
     savePrayers(updated);
     try {
-      await fetch(`/api/prayers/${id}`, {
+      await fetch(getApiUrl(`/api/prayers/${id}`), {
         method: 'DELETE'
       });
     } catch (err) {

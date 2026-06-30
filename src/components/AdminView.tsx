@@ -96,6 +96,7 @@ export default function AdminView({
   const [settingsIntroText1, setSettingsIntroText1] = useState(settings.introText1 || 'Cây có gốc mới nở cành xanh ngọn, nước có nguồn mới bể rộng sông sâu. Người có tổ tông mới sinh con cháu, hiếu nghĩa vẹn tròn mới rạng rỡ tổ tiên.');
   const [settingsIntroText2, setSettingsIntroText2] = useState(settings.introText2 || 'Gia phả gia đình dòng họ Cụ Nghiêm Cung (kế thừa dòng dõi cụ cố Nghiêm Điều (Chu) tại vùng đất Hòa Xá cổ kính, giàu truyền thống cách mạng) được lập ra nhằm mục đích kính cáo tổ tông, ghi chép tường tận huyết mạch dòng giống, lưu truyền cho con cháu vạn đời sau không bao giờ quên đi nguồn cội thiêng liêng của mình.');
   const [settingsIntroText3, setSettingsIntroText3] = useState(settings.introText3 || 'Trải qua bao thăng trầm của lịch sử, con cháu họ Nghiêm luôn gìn giữ nếp gia phong nghiêm cẩn, lấy hiếu học làm đầu, lấy đức độ làm trọng, lấy trung thực làm gương và hết lòng đùm bọc, giúp đỡ lẫn nhau vượt qua gian khó, lập thân kiến nghiệp làm rạng danh gia đình.');
+  const [apiBackendUrl, setApiBackendUrl] = useState(localStorage.getItem('gia_pha_api_backend_url') || '');
 
   // Local states for custom user provisioning
   const [newUsername, setNewUsername] = useState('');
@@ -436,6 +437,7 @@ export default function AdminView({
   const handleSaveBannerSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      localStorage.setItem('gia_pha_api_backend_url', apiBackendUrl.trim());
       await onSaveSetting('heroTitle', settingsHeroTitle);
       await onSaveSetting('heroSubtitle', settingsHeroSubtitle);
       await onSaveSetting('heroImage', settingsHeroImage);
@@ -444,7 +446,7 @@ export default function AdminView({
       await onSaveSetting('introText1', settingsIntroText1);
       await onSaveSetting('introText2', settingsIntroText2);
       await onSaveSetting('introText3', settingsIntroText3);
-      alert('Đã cập nhật cấu hình Banner, Khung hình và thông tin giới thiệu Gia tộc thành công!');
+      alert('Đã cập nhật cấu hình Banner, Khung hình, liên kết máy chủ trực tuyến và thông tin giới thiệu Gia tộc thành công!');
     } catch (err) {
       alert('Đã xảy ra lỗi khi lưu cấu hình.');
     }
@@ -915,6 +917,42 @@ export default function AdminView({
                         placeholder="Tải ảnh lên hoặc dán URL ảnh muốn lồng vào khung..."
                       />
                     </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-[#fdfbf7] p-4 rounded-xl border border-[#eadecb] space-y-4">
+              <h3 className="text-sm font-bold text-[#6b4724] font-serif uppercase tracking-wider flex items-center gap-1.5 border-b border-[#eadecb] pb-2">
+                <Shield className="w-4 h-4 text-[#b8956b]" />
+                Cấu hình kết nối Máy chủ Trực tuyến (Chế độ Động)
+              </h3>
+              <p className="text-[11px] text-[#6b4724] leading-relaxed">
+                Khi triển khai ứng dụng lên các nền tảng tĩnh (như Vercel, Netlify, GitHub Pages), trình duyệt cần biết địa chỉ máy chủ Node.js/Cloud Run của bạn để lưu và cập nhật dữ liệu trực tuyến (Supabase).
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <label className="block font-bold text-[#6b4724] mb-1">Địa chỉ Máy chủ API (Backend URL):</label>
+                  <input
+                    type="url"
+                    value={apiBackendUrl}
+                    onChange={(e) => setApiBackendUrl(e.target.value)}
+                    className="w-full p-2.5 border border-[#d6b583] rounded bg-white font-medium focus:ring-1 focus:ring-[#b8956b] focus:outline-none"
+                    placeholder="Ví dụ: https://ais-pre-zfw6q4xcvwloawlouuzxzj-66410271426.asia-southeast1.run.app"
+                  />
+                  <div className="mt-1.5 flex flex-wrap gap-2 items-center">
+                    <span className="text-[10px] text-gray-500">Mẹo: Nếu đang truy cập ở máy chủ gốc, bạn có thể nhấn sao chép địa chỉ hiện tại bên dưới và dán vào ô trên:</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const origin = window.location.origin;
+                        setApiBackendUrl(origin);
+                        alert(`Đã sao chép địa chỉ hiện tại: ${origin}`);
+                      }}
+                      className="px-2 py-1 bg-amber-100 hover:bg-amber-200 text-[#7c562e] rounded text-[10px] font-bold border border-amber-300 transition"
+                    >
+                      Sử dụng địa chỉ hiện tại ({window.location.origin})
+                    </button>
                   </div>
                 </div>
               </div>
