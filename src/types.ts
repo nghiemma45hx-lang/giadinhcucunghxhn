@@ -52,6 +52,7 @@ export interface SystemUser {
   fullName: string;
   role: 'admin' | 'user';
   password?: string;
+  isFirstLogin?: boolean;
 }
 
 export interface SystemSetting {

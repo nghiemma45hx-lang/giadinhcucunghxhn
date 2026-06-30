@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { TreeDeciduous, LogIn, LogOut, Shield, Heart, Users, BookOpen, BarChart3, HelpCircle, Star, Edit, Image } from 'lucide-react';
+import { TreeDeciduous, LogIn, LogOut, Shield, Heart, Users, BookOpen, BarChart3, HelpCircle, Star, Edit, Image, Eye, EyeOff } from 'lucide-react';
 import { FamilyMember, Announcement, AltarPrayer, SystemLog, SystemUser } from './types';
 import { initialMembers, initialAnnouncements } from './data/familyData';
 
@@ -49,6 +49,14 @@ export default function App() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [passwordChangeUser, setPasswordChangeUser] = useState<any | null>(null);
+  const [isPasswordChangeModalOpen, setIsPasswordChangeModalOpen] = useState(false);
+  const [changeNewPassword, setChangeNewPassword] = useState('');
+  const [changeConfirmPassword, setChangeConfirmPassword] = useState('');
+  const [showChangeNewPassword, setShowChangeNewPassword] = useState(false);
+  const [showChangeConfirmPassword, setShowChangeConfirmPassword] = useState(false);
+  const [changePasswordError, setChangePasswordError] = useState('');
 
   // Initialize and load from Supabase with localStorage fallbacks
   useEffect(() => {
@@ -261,25 +269,38 @@ export default function App() {
     e.preventDefault();
     setLoginError('');
 
-    const customUser = users.find(u => u.username === username.trim().toLowerCase() && u.password === password);
+    const enteredUsername = username.trim().toLowerCase();
+    const customUser = users.find(u => u.username === enteredUsername && u.password === password);
+    const adminPassword = settings.admin_password_override || 'admin';
 
-    // Specific instruction rule: admin/admin login explicitly
-    if (username === 'admin' && password === 'admin') {
+    if (enteredUsername === 'admin' && password === adminPassword) {
       const user = { username: 'admin', fullName: 'Quản Trị Viên Chi Trưởng', role: 'admin' };
-      setCurrentUser(user);
-      localStorage.setItem('gia_pha_user', JSON.stringify(user));
-      setIsLoginModalOpen(false);
-      setUsername('');
-      setPassword('');
-      addLog('đăng nhập vào hệ thống quản trị', 'admin');
+      if (password === 'admin') {
+        // First time using default password, prompt password change
+        setPasswordChangeUser(user);
+        setIsPasswordChangeModalOpen(true);
+      } else {
+        setCurrentUser(user);
+        localStorage.setItem('gia_pha_user', JSON.stringify(user));
+        setIsLoginModalOpen(false);
+        setUsername('');
+        setPassword('');
+        addLog('đăng nhập vào hệ thống quản trị', 'admin');
+      }
     } else if (customUser) {
       const user = { username: customUser.username, fullName: customUser.fullName, role: customUser.role };
-      setCurrentUser(user);
-      localStorage.setItem('gia_pha_user', JSON.stringify(user));
-      setIsLoginModalOpen(false);
-      setUsername('');
-      setPassword('');
-      addLog('đăng nhập vào hệ thống quản trị', customUser.fullName);
+      if (customUser.isFirstLogin !== false) {
+        // First time using default password, prompt password change
+        setPasswordChangeUser(customUser);
+        setIsPasswordChangeModalOpen(true);
+      } else {
+        setCurrentUser(user);
+        localStorage.setItem('gia_pha_user', JSON.stringify(user));
+        setIsLoginModalOpen(false);
+        setUsername('');
+        setPassword('');
+        addLog('đăng nhập vào hệ thống quản trị', customUser.fullName);
+      }
     } else {
       setLoginError('Sai tài khoản đăng nhập hoặc mật khẩu quản trị!');
     }
@@ -291,6 +312,42 @@ export default function App() {
     localStorage.removeItem('gia_pha_user');
     if (currentTab === 'admin') {
       setCurrentTab('home');
+    }
+  };
+
+  const handlePasswordChangeSubmit = async (newPass: string) => {
+    if (!passwordChangeUser) return;
+
+    const u = passwordChangeUser;
+    if (u.username === 'admin') {
+      await handleSaveSetting('admin_password_override', newPass);
+      const loggedUser = { username: 'admin', fullName: 'Quản Trị Viên Chi Trưởng', role: 'admin' };
+      setCurrentUser(loggedUser);
+      localStorage.setItem('gia_pha_user', JSON.stringify(loggedUser));
+      setIsLoginModalOpen(false);
+      setIsPasswordChangeModalOpen(false);
+      setPasswordChangeUser(null);
+      setUsername('');
+      setPassword('');
+      addLog('thay đổi mật khẩu quản trị mặc định thành công và đăng nhập', 'admin');
+      alert('Đã thay đổi mật khẩu quản trị mặc định thành công và đăng nhập!');
+    } else {
+      const updatedUser: SystemUser = {
+        ...u,
+        password: newPass,
+        isFirstLogin: false
+      };
+      await handleAddUser(updatedUser);
+      const loggedUser = { username: updatedUser.username, fullName: updatedUser.fullName, role: updatedUser.role };
+      setCurrentUser(loggedUser);
+      localStorage.setItem('gia_pha_user', JSON.stringify(loggedUser));
+      setIsLoginModalOpen(false);
+      setIsPasswordChangeModalOpen(false);
+      setPasswordChangeUser(null);
+      setUsername('');
+      setPassword('');
+      addLog('thay đổi mật khẩu lần đầu thành công và đăng nhập', updatedUser.fullName);
+      alert('Đã thay đổi mật khẩu đăng nhập lần đầu thành công!');
     }
   };
 
@@ -1361,14 +1418,24 @@ export default function App() {
 
               <div>
                 <label className="block font-bold text-[#6b4724] mb-1">Mật khẩu bảo mật (*):</label>
-                <input
-                  type="password"
-                  required
-                  placeholder="Nhập mật khẩu truy cập"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full p-2.5 border border-[#d6b583] rounded bg-[#fdfbf7] text-sm focus:outline-none focus:ring-2 focus:ring-[#b8956b]"
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    placeholder="Nhập mật khẩu truy cập"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full p-2.5 pr-10 border border-[#d6b583] rounded bg-[#fdfbf7] text-sm focus:outline-none focus:ring-2 focus:ring-[#b8956b]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-[#6b4724] transition focus:outline-none"
+                    title={showPassword ? "Ẩn mật khẩu" : "Hiển thị mật khẩu"}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
 
               <div className="pt-2">
@@ -1383,6 +1450,127 @@ export default function App() {
               <p className="text-[10px] text-gray-400 text-center italic mt-2">
                 Tài khoản dùng thử quy định: <strong>admin / admin</strong>
               </p>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 6.1 FORCE PASSWORD CHANGE MODAL */}
+      {isPasswordChangeModalOpen && passwordChangeUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-xs z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full overflow-hidden border-2 border-[#b8956b] shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="p-5 bg-[#3e2a16] text-center text-white relative">
+              <button
+                onClick={() => {
+                  setIsPasswordChangeModalOpen(false);
+                  setPasswordChangeUser(null);
+                  setChangeNewPassword('');
+                  setChangeConfirmPassword('');
+                  setChangePasswordError('');
+                }}
+                className="absolute top-4 right-4 text-gray-400 hover:text-white text-xl font-bold leading-none"
+              >
+                &times;
+              </button>
+              <Shield className="w-10 h-10 text-[#d6b583] mx-auto mb-2 animate-pulse" />
+              <h3 className="text-lg font-bold font-serif uppercase tracking-wider text-[#fdfbf7]">🔒 ĐỔI MẬT KHẨU LẦN ĐẦU</h3>
+              <p className="text-[10px] text-yellow-300 mt-1 max-w-xs mx-auto leading-relaxed">
+                Hệ thống phát hiện đây là lần đăng nhập đầu tiên với mật khẩu mặc định. Vui lòng cập nhật mật khẩu mới để bảo mật tài khoản.
+              </p>
+            </div>
+
+            <form 
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setChangePasswordError('');
+                
+                const newPass = changeNewPassword.trim();
+                const confirmPass = changeConfirmPassword.trim();
+
+                if (!newPass) {
+                  setChangePasswordError('Vui lòng nhập mật khẩu mới.');
+                  return;
+                }
+                if (newPass.length < 6) {
+                  setChangePasswordError('Mật khẩu mới phải từ 6 ký tự trở lên.');
+                  return;
+                }
+                if (newPass === 'admin' || newPass === passwordChangeUser.password) {
+                  setChangePasswordError('Mật khẩu mới không được trùng với mật khẩu mặc định ban đầu.');
+                  return;
+                }
+                if (newPass !== confirmPass) {
+                  setChangePasswordError('Xác nhận mật khẩu mới không trùng khớp.');
+                  return;
+                }
+
+                await handlePasswordChangeSubmit(newPass);
+                setChangeNewPassword('');
+                setChangeConfirmPassword('');
+              }} 
+              className="p-6 space-y-4 text-xs text-[#4a331a]"
+            >
+              {changePasswordError && (
+                <div className="p-2.5 bg-red-50 border border-red-300 text-red-700 font-semibold rounded text-center">
+                  {changePasswordError}
+                </div>
+              )}
+
+              <div className="bg-[#fcf8f2] p-3 rounded border border-[#eadecb] mb-1">
+                <p className="font-semibold text-xs text-[#6b4724]">Tài khoản: <span className="font-extrabold text-amber-900">{passwordChangeUser.username}</span></p>
+                <p className="text-[10px] text-gray-500 mt-0.5">Tên hiển thị: {passwordChangeUser.fullName}</p>
+              </div>
+
+              <div>
+                <label className="block font-bold text-[#6b4724] mb-1">Mật khẩu mới (*):</label>
+                <div className="relative">
+                  <input
+                    type={showChangeNewPassword ? "text" : "password"}
+                    required
+                    placeholder="Tối thiểu 6 ký tự"
+                    value={changeNewPassword}
+                    onChange={(e) => setChangeNewPassword(e.target.value)}
+                    className="w-full p-2.5 pr-10 border border-[#d6b583] rounded bg-[#fdfbf7] text-sm focus:outline-none focus:ring-2 focus:ring-[#b8956b]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowChangeNewPassword(!showChangeNewPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-[#6b4724] transition focus:outline-none"
+                  >
+                    {showChangeNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-[#6b4724] mb-1">Xác nhận mật khẩu mới (*):</label>
+                <div className="relative">
+                  <input
+                    type={showChangeConfirmPassword ? "text" : "password"}
+                    required
+                    placeholder="Nhập lại mật khẩu mới"
+                    value={changeConfirmPassword}
+                    onChange={(e) => setChangeConfirmPassword(e.target.value)}
+                    className="w-full p-2.5 pr-10 border border-[#d6b583] rounded bg-[#fdfbf7] text-sm focus:outline-none focus:ring-2 focus:ring-[#b8956b]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowChangeConfirmPassword(!showChangeConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-[#6b4724] transition focus:outline-none"
+                  >
+                    {showChangeConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  className="w-full bg-[#6b4724] hover:bg-[#54371b] text-white font-extrabold text-sm py-3 rounded-lg shadow-md transition uppercase tracking-wider"
+                >
+                  Cập nhật mật khẩu & Đăng nhập
+                </button>
+              </div>
             </form>
           </div>
         </div>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
-import { Settings, PlusCircle, Trash2, Edit2, Users, Bell, Activity, Save, X, Plus, Image, Key, Shield } from 'lucide-react';
+import { Settings, PlusCircle, Trash2, Edit2, Users, Bell, Activity, Save, X, Plus, Image, Key, Shield, Eye, EyeOff } from 'lucide-react';
 // @ts-ignore
 import { LunarDate } from 'vietnamese-lunar-calendar';
 import { FamilyMember, Announcement, SystemLog, SystemUser } from '../types';
@@ -102,9 +102,10 @@ export default function AdminView({
   const [newPassword, setNewPassword] = useState('');
   const [newFullName, setNewFullName] = useState('');
   const [newUserRole, setNewUserRole] = useState<'admin' | 'user'>('admin');
+  const [showCreatePassword, setShowCreatePassword] = useState(false);
 
   // States for bulk user creation
-  const [bulkUsers, setBulkUsers] = useState<Array<{username: string, password: string, fullName: string, role: 'admin' | 'user'}>>([]);
+  const [bulkUsers, setBulkUsers] = useState<SystemUser[]>([]);
   const [isBulkUploading, setIsBulkUploading] = useState(false);
 
   // Synchronize dynamic settings once loaded
@@ -459,7 +460,8 @@ export default function AdminView({
       username: newUsername.trim().toLowerCase(),
       password: newPassword.trim(),
       fullName: newFullName.trim(),
-      role: newUserRole
+      role: newUserRole,
+      isFirstLogin: true
     };
     try {
       await onAddUser(payload);
@@ -522,7 +524,7 @@ export default function AdminView({
           return;
         }
 
-        const parsed: Array<{username: string, password: string, fullName: string, role: 'admin' | 'user'}> = [];
+        const parsed: SystemUser[] = [];
         let errors = [];
 
         // Skip the header (rows[0])
@@ -563,7 +565,7 @@ export default function AdminView({
             continue;
           }
 
-          parsed.push({ username, password, fullName, role });
+          parsed.push({ username, password, fullName, role, isFirstLogin: true });
         }
 
         if (errors.length > 0) {
@@ -995,14 +997,24 @@ export default function AdminView({
 
                 <div>
                   <label className="block font-bold text-[#6b4724] mb-1">Mật khẩu truy cập (*):</label>
-                  <input
-                    type="password"
-                    required
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full p-2 border border-[#d6b583] rounded bg-white focus:outline-none"
-                    placeholder="Nhập mật khẩu an toàn..."
-                  />
+                  <div className="relative">
+                    <input
+                      type={showCreatePassword ? "text" : "password"}
+                      required
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full p-2 pr-10 border border-[#d6b583] rounded bg-white focus:outline-none text-sm"
+                      placeholder="Nhập mật khẩu an toàn..."
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCreatePassword(!showCreatePassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-[#6b4724] transition focus:outline-none"
+                      title={showCreatePassword ? "Ẩn mật khẩu" : "Hiển thị mật khẩu"}
+                    >
+                      {showCreatePassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
 
                 <div>
