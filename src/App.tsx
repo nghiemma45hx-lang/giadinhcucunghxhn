@@ -29,6 +29,7 @@ export default function App() {
   const [tablesNeedInitialization, setTablesNeedInitialization] = useState(false);
   const [isSqlModalOpen, setIsSqlModalOpen] = useState(false);
   const [isDbStatusModalOpen, setIsDbStatusModalOpen] = useState(false);
+  const [isCheckingDb, setIsCheckingDb] = useState(false);
   const [supabaseStatus, setSupabaseStatus] = useState<{
     success: boolean;
     region: string;
@@ -45,9 +46,11 @@ export default function App() {
     }
   };
 
-  const fetchSupabaseStatus = async () => {
+  const fetchSupabaseStatus = async (recheck = false) => {
+    setIsCheckingDb(true);
     try {
-      const res = await fetch(getApiUrl('/api/config/supabase'));
+      const url = getApiUrl(`/api/config/supabase${recheck ? '?recheck=true' : ''}`);
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
         setSupabaseStatus({
@@ -58,6 +61,8 @@ export default function App() {
       }
     } catch (err) {
       console.error("Failed to fetch Supabase status:", err);
+    } finally {
+      setIsCheckingDb(false);
     }
   };
 
@@ -1924,7 +1929,9 @@ CREATE TABLE IF NOT EXISTS system_settings (
             <div className="p-5 bg-[#3e2a16] text-white flex justify-between items-center">
               <h3 className="text-base font-bold font-serif uppercase tracking-wider text-[#fdfbf7] flex items-center gap-2">
                 <span className={`w-2.5 h-2.5 rounded-full ${
-                  tablesNeedInitialization
+                  isCheckingDb
+                    ? 'bg-blue-400 animate-spin border-2 border-t-transparent'
+                    : tablesNeedInitialization
                     ? 'bg-amber-400 animate-pulse'
                     : !supabaseStatus || !supabaseStatus.success
                     ? 'bg-rose-400 animate-pulse'
@@ -1950,7 +1957,9 @@ CREATE TABLE IF NOT EXISTS system_settings (
                       ? 'bg-rose-50 text-rose-700 border border-rose-200'
                       : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                   }`}>
-                    {tablesNeedInitialization
+                    {isCheckingDb
+                      ? 'Đang kiểm tra...'
+                      : tablesNeedInitialization
                       ? 'Chưa khởi tạo bảng'
                       : !supabaseStatus || !supabaseStatus.success
                       ? 'Ngoại tuyến (Offline)'
@@ -1985,7 +1994,9 @@ CREATE TABLE IF NOT EXISTS system_settings (
 
               <div className="space-y-2 leading-relaxed text-[#6b4724]">
                 <p>
-                  {tablesNeedInitialization ? (
+                  {isCheckingDb ? (
+                    'Hệ thống đang tiến hành kiểm tra và tự động hiệu chỉnh kết nối tới dự án cơ sở dữ liệu Supabase của dòng họ Nghiêm...'
+                  ) : tablesNeedInitialization ? (
                     'Hệ thống phát hiện dự án Supabase của bạn đã kết nối được nhưng các bảng dữ liệu (như family_members, announcements, prayers) chưa được tạo. Hãy chạy mã SQL khởi tạo để sử dụng.'
                   ) : !supabaseStatus || !supabaseStatus.success ? (
                     'Hiện tại hệ thống không thể kết nối tới cơ sở dữ liệu Supabase của bạn. Ứng dụng đã tự động kích hoạt chế độ Lưu trữ Nội bộ (Local Storage) để bảo vệ toàn bộ thao tác thêm, sửa của bạn, dữ liệu sẽ không bị mất.'
@@ -1998,7 +2009,21 @@ CREATE TABLE IF NOT EXISTS system_settings (
                 </p>
               </div>
 
-              <div className="flex justify-between gap-2 pt-2 border-t border-gray-100">
+              <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-gray-100">
+                <button
+                  disabled={isCheckingDb}
+                  onClick={() => fetchSupabaseStatus(true)}
+                  className={`bg-emerald-600 text-white hover:bg-emerald-700 px-4 py-2 rounded-lg font-bold transition flex-1 text-center disabled:opacity-50 flex items-center justify-center gap-1.5`}
+                >
+                  {isCheckingDb ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                      <span>Đang kiểm tra...</span>
+                    </>
+                  ) : (
+                    'Kiểm tra lại'
+                  )}
+                </button>
                 <button
                   onClick={() => {
                     setIsDbStatusModalOpen(false);

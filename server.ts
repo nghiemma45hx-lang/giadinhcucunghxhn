@@ -1474,13 +1474,19 @@ app.post("/api/settings", async (req, res) => {
 app.get("/api/config/supabase", async (req, res) => {
   try {
     const customConfig = getCustomSupabaseConfig() || {};
-    let status = { success: false, error: "Chưa kiểm tra kết nối" };
-    const statusPath = path.join(process.cwd(), "db_status.json");
-    if (fs.existsSync(statusPath)) {
-      try {
-        status = JSON.parse(fs.readFileSync(statusPath, "utf-8"));
-      } catch (e) {}
+    let status: any = { success: false, error: "Chưa kiểm tra kết nối" };
+    
+    if (req.query.recheck === "true") {
+      status = await runSupabaseSelfTest();
+    } else {
+      const statusPath = path.join(process.cwd(), "db_status.json");
+      if (fs.existsSync(statusPath)) {
+        try {
+          status = JSON.parse(fs.readFileSync(statusPath, "utf-8"));
+        } catch (e) {}
+      }
     }
+    
     return res.json({
       config: {
         url: customConfig.url || "",
@@ -1506,21 +1512,28 @@ app.post("/api/config/supabase", async (req, res) => {
       finalKey = prevConfig.serviceRoleKey || "";
     }
 
+    const defaultUrl = "https://domczpyfjiqttwdcrdsj.supabase.co";
+    const defaultServiceKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRvbWN6cHlmamlxdHR3ZGNyZHNqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjcwMTM5NCwiZXhwIjoyMDk4Mjc3Mzk0fQ.-2ksd7TQPy6hDPwE2S2OWUzWC0ws04FjecgL2lhRWf0";
+    const defaultAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRvbWN6cHlmamlxdHR3ZGNyZHNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3MDEzOTQsImV4cCI6MjA5ODI3NzM5NH0.7VY58jKG2V-uH9cQik9HRN7KuInjSKFiqHspkK910FE";
+
+    const savedUrl = url ? url.trim() : defaultUrl;
+    let savedServiceKey = finalKey ? finalKey.trim() : "";
+    let savedAnonKey = anonKey ? anonKey.trim() : "";
+
+    // If using default/fallback project URL, populate with default keys if missing
+    if (savedUrl === defaultUrl || savedUrl.includes("domczpyfjiqttwdcrdsj.supabase.co")) {
+      if (!savedServiceKey) savedServiceKey = defaultServiceKey;
+      if (!savedAnonKey) savedAnonKey = defaultAnonKey;
+    }
+
     const newConfig = {
-      url: url ? url.trim() : "",
-      serviceRoleKey: finalKey ? finalKey.trim() : "",
-      anonKey: anonKey ? anonKey.trim() : "",
-      region: region || "custom"
+      url: savedUrl,
+      serviceRoleKey: savedServiceKey,
+      anonKey: savedAnonKey,
+      region: region || "sydney"
     };
 
-    if (!newConfig.url) {
-      // If URL is empty, delete custom config file to revert to defaults
-      if (fs.existsSync(CONFIG_FILE)) {
-        fs.unlinkSync(CONFIG_FILE);
-      }
-    } else {
-      fs.writeFileSync(CONFIG_FILE, JSON.stringify(newConfig, null, 2), "utf-8");
-    }
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(newConfig, null, 2), "utf-8");
 
     // Run connection test
     const status = await runSupabaseSelfTest();
