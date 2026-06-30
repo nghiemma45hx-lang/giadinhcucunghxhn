@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import * as XLSX from 'xlsx';
 import { Settings, PlusCircle, Trash2, Edit2, Users, Bell, Activity, Save, X, Plus, Image, Key, Shield } from 'lucide-react';
 // @ts-ignore
 import { LunarDate } from 'vietnamese-lunar-calendar';
@@ -471,22 +472,32 @@ export default function AdminView({
     }
   };
 
-  // Download account import template (CSV format compatible with Excel)
-  const handleDownloadTemplate = () => {
-    const headers = 'Tên đăng nhập (username),Mật khẩu (password),Tên hiển thị (fullName),Vai trò (admin hoặc user)\n';
-    const sampleData1 = 'nghiemtuan,Matkhau123!,Nghiêm Văn Tuấn,user\n';
-    const sampleData2 = 'nghiemhoa,Matkhau456!,Nghiêm Thị Hoa,admin\n';
-    
-    // Add UTF-8 BOM so Excel opens it with Vietnamese characters correctly
-    const csvContent = '\uFEFF' + headers + sampleData1 + sampleData2;
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', 'bieu_mau_cap_tai_khoan_dong_loat.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  // Download account import template (supports XLSX, XLS, and CSV)
+  const handleDownloadTemplate = (format: 'xlsx' | 'xls' | 'csv') => {
+    const headers = [
+      ['Tên đăng nhập (username)', 'Mật khẩu (password)', 'Tên hiển thị (fullName)', 'Vai trò (admin hoặc user)'],
+      ['nghiemtuan', 'Matkhau123!', 'Nghiêm Văn Tuấn', 'user'],
+      ['nghiemhoa', 'Matkhau456!', 'Nghiêm Thị Hoa', 'admin']
+    ];
+
+    if (format === 'csv') {
+      // Create CSV format with UTF-8 BOM so Excel opens it with correct Vietnamese encoding
+      const csvContent = '\uFEFF' + headers.map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(',')).join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'bieu_mau_cap_tai_khoan_dong_loat.csv');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      // Generate real Excel sheet (.xlsx or .xls) using SheetJS
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet(headers);
+      XLSX.utils.book_append_sheet(wb, ws, 'Bieu Mau Tai Khoan');
+      XLSX.writeFile(wb, `bieu_mau_cap_tai_khoan_dong_loat.${format}`);
+    }
   };
 
   // Handle CSV/Excel template parsing for bulk creation
@@ -494,70 +505,83 @@ export default function AdminView({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
-      if (!text) return;
-
-      const lines = text.split(/\r?\n/);
-      const parsed: Array<{username: string, password: string, fullName: string, role: 'admin' | 'user'}> = [];
-      let errors = [];
-
-      // Skip the header (lines[0])
-      for (let i = 1; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line) continue; // Skip empty lines
-
-        const delimiter = line.includes(';') ? ';' : ',';
-        const parts = line.split(delimiter).map(p => p.trim().replace(/^["']|["']$/g, ''));
-
-        if (parts.length < 3) {
-          errors.push(`Dòng ${i + 1}: Thiếu thông tin bắt buộc (Cần: Tên đăng nhập, Mật khẩu, Tên hiển thị)`);
-          continue;
+    const fileReader = new FileReader();
+    fileReader.onload = (event) => {
+      try {
+        const arrayBuffer = event.target?.result as ArrayBuffer;
+        const data = new Uint8Array(arrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        
+        // Convert worksheet to JSON (2D array format)
+        const rows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
+        
+        if (rows.length <= 1) {
+          alert("Không tìm thấy dòng tài khoản nào trong tệp tin để nhập.");
+          return;
         }
 
-        const username = parts[0].toLowerCase();
-        const password = parts[1];
-        const fullName = parts[2];
-        let role: 'admin' | 'user' = 'user';
-        if (parts[3] && parts[3].toLowerCase() === 'admin') {
-          role = 'admin';
+        const parsed: Array<{username: string, password: string, fullName: string, role: 'admin' | 'user'}> = [];
+        let errors = [];
+
+        // Skip the header (rows[0])
+        for (let i = 1; i < rows.length; i++) {
+          const row = rows[i];
+          if (!row || row.length === 0) continue;
+
+          // Convert cells to string safely
+          const usernameVal = row[0] !== undefined && row[0] !== null ? String(row[0]).trim() : '';
+          const passwordVal = row[1] !== undefined && row[1] !== null ? String(row[1]).trim() : '';
+          const fullNameVal = row[2] !== undefined && row[2] !== null ? String(row[2]).trim() : '';
+          const roleVal = row[3] !== undefined && row[3] !== null ? String(row[3]).trim().toLowerCase() : 'user';
+
+          // Skip empty row
+          if (!usernameVal && !passwordVal && !fullNameVal) continue;
+
+          if (!usernameVal) {
+            errors.push(`Dòng ${i + 1}: Tên đăng nhập trống.`);
+            continue;
+          }
+          if (!passwordVal) {
+            errors.push(`Dòng ${i + 1}: Mật khẩu trống.`);
+            continue;
+          }
+          if (!fullNameVal) {
+            errors.push(`Dòng ${i + 1}: Tên hiển thị trống.`);
+            continue;
+          }
+
+          const username = usernameVal.toLowerCase();
+          const password = passwordVal;
+          const fullName = fullNameVal;
+          const role: 'admin' | 'user' = (roleVal === 'admin') ? 'admin' : 'user';
+
+          // Check duplicate within parsed array or existing users
+          if (parsed.some(u => u.username === username) || users.some(u => u.username === username) || username === 'admin') {
+            errors.push(`Dòng ${i + 1}: Tên đăng nhập "${username}" đã tồn tại trên hệ thống hoặc bị trùng lặp.`);
+            continue;
+          }
+
+          parsed.push({ username, password, fullName, role });
         }
 
-        if (!username) {
-          errors.push(`Dòng ${i + 1}: Tên đăng nhập trống.`);
-          continue;
-        }
-        if (!password) {
-          errors.push(`Dòng ${i + 1}: Mật khẩu trống.`);
-          continue;
-        }
-        if (!fullName) {
-          errors.push(`Dòng ${i + 1}: Tên hiển thị trống.`);
-          continue;
+        if (errors.length > 0) {
+          alert("Có một số dòng lỗi phát hiện trong biểu mẫu:\n" + errors.slice(0, 5).join('\n') + (errors.length > 5 ? `\n... và ${errors.length - 5} lỗi khác.` : ''));
         }
 
-        // Check duplicate within parsed array or existing users
-        if (parsed.some(u => u.username === username) || users.some(u => u.username === username) || username === 'admin') {
-          errors.push(`Dòng ${i + 1}: Tên đăng nhập "${username}" đã tồn tại trên hệ thống hoặc bị trùng lặp.`);
-          continue;
+        if (parsed.length > 0) {
+          setBulkUsers(parsed);
+          alert(`Đã đọc thành công ${parsed.length} tài khoản từ biểu mẫu! Vui lòng kiểm tra danh sách xem trước phía dưới và nhấn "Xác nhận cấp đồng loạt" để tạo.`);
+        } else {
+          alert("Không tìm thấy dòng tài khoản hợp lệ nào trong tệp tin để nhập.");
         }
-
-        parsed.push({ username, password, fullName, role });
-      }
-
-      if (errors.length > 0) {
-        alert("Có một số dòng lỗi phát hiện trong biểu mẫu:\n" + errors.slice(0, 5).join('\n') + (errors.length > 5 ? `\n... và ${errors.length - 5} lỗi khác.` : ''));
-      }
-
-      if (parsed.length > 0) {
-        setBulkUsers(parsed);
-        alert(`Đã đọc thành công ${parsed.length} tài khoản từ biểu mẫu! Vui lòng kiểm tra danh sách xem trước phía dưới và nhấn "Xác nhận cấp đồng loạt" để tạo.`);
-      } else {
-        alert("Không tìm thấy dòng tài khoản hợp lệ nào trong tệp tin để nhập.");
+      } catch (err: any) {
+        console.error("Error parsing file:", err);
+        alert(`Lỗi khi đọc hoặc phân tích tệp tin: ${err.message || 'Định dạng tệp không được hỗ trợ.'}`);
       }
     };
-    reader.readAsText(file, 'UTF-8');
+    fileReader.readAsArrayBuffer(file);
     // Reset file input value
     e.target.value = '';
   };
@@ -1021,32 +1045,60 @@ export default function AdminView({
                   Cấp Tài Khoản Đồng Loạt
                 </h3>
                 <p className="text-gray-500 leading-relaxed text-[11px]">
-                  Tải biểu mẫu nhập liệu dạng .csv (hoàn toàn tương thích tốt với Excel), nhập thông tin danh sách tài khoản cần cấp rồi tải lên hệ thống.
+                  Tải biểu mẫu nhập liệu theo định dạng ưa thích (Excel .xlsx, .xls hoặc .csv), nhập danh sách tài khoản rồi tải lên lại hệ thống để kích hoạt đồng loạt.
                 </p>
 
-                <div className="flex flex-col gap-2.5">
-                  <button
-                    type="button"
-                    onClick={handleDownloadTemplate}
-                    className="w-full py-2 bg-white hover:bg-gray-50 text-[#b8956b] border border-[#b8956b] font-bold rounded transition flex items-center justify-center gap-1.5"
-                  >
-                    📥 Tải biểu mẫu tài khoản (.csv)
-                  </button>
+                <div className="flex flex-col gap-3">
+                  <div className="space-y-1.5">
+                    <span className="block text-[11px] font-bold text-[#6b4724]">1. Chọn tải mẫu đăng ký tài khoản:</span>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadTemplate('xlsx')}
+                        className="py-2 px-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold rounded text-[10px] transition text-center flex flex-col items-center justify-center gap-0.5"
+                        title="Tải mẫu Excel 2007+ (.xlsx)"
+                      >
+                        <span className="text-xs">📊</span>
+                        <span>Excel (.xlsx)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadTemplate('xls')}
+                        className="py-2 px-1 bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 font-bold rounded text-[10px] transition text-center flex flex-col items-center justify-center gap-0.5"
+                        title="Tải mẫu Excel 97-2003 (.xls)"
+                      >
+                        <span className="text-xs">📉</span>
+                        <span>Excel (.xls)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadTemplate('csv')}
+                        className="py-2 px-1 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 font-bold rounded text-[10px] transition text-center flex flex-col items-center justify-center gap-0.5"
+                        title="Tải mẫu dạng văn bản ngăn cách (.csv)"
+                      >
+                        <span className="text-xs">📄</span>
+                        <span>CSV (.csv)</span>
+                      </button>
+                    </div>
+                  </div>
 
-                  <div className="relative">
-                    <input
-                      type="file"
-                      accept=".csv"
-                      onChange={handleBulkUploadChange}
-                      className="hidden"
-                      id="bulk-user-file-upload"
-                    />
-                    <label
-                      htmlFor="bulk-user-file-upload"
-                      className="w-full py-2 bg-[#6b4724] hover:bg-[#54371b] text-white font-bold rounded transition flex items-center justify-center gap-1.5 cursor-pointer text-center"
-                    >
-                      📤 Tải lên tệp biểu mẫu (.csv)
-                    </label>
+                  <div className="space-y-1.5 pt-1">
+                    <span className="block text-[11px] font-bold text-[#6b4724]">2. Tải lên tệp đã điền:</span>
+                    <div className="relative">
+                      <input
+                        type="file"
+                        accept=".xlsx,.xls,.csv"
+                        onChange={handleBulkUploadChange}
+                        className="hidden"
+                        id="bulk-user-file-upload"
+                      />
+                      <label
+                        htmlFor="bulk-user-file-upload"
+                        className="w-full py-2 bg-[#6b4724] hover:bg-[#54371b] text-white font-bold rounded transition flex items-center justify-center gap-1.5 cursor-pointer text-center"
+                      >
+                        📤 Tải lên tệp biểu mẫu (.xlsx, .xls, .csv)
+                      </label>
+                    </div>
                   </div>
                 </div>
 
