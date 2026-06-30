@@ -14,6 +14,7 @@ interface AdminViewProps {
   onEditMember: (member: FamilyMember) => void;
   onDeleteMember: (id: string) => void;
   onAddAnnouncement: (announcement: Announcement) => void;
+  onEditAnnouncement?: (announcement: Announcement) => void;
   onDeleteAnnouncement: (id: string) => void;
   // Banner & Gia tộc settings
   settings: Record<string, string>;
@@ -32,6 +33,7 @@ export default function AdminView({
   onEditMember,
   onDeleteMember,
   onAddAnnouncement,
+  onEditAnnouncement,
   onDeleteAnnouncement,
   settings,
   onSaveSetting,
@@ -79,6 +81,7 @@ export default function AdminView({
 
   // Announcement Form Fields
   const [isAnnModalOpen, setIsAnnModalOpen] = useState(false);
+  const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
   const [annTitle, setAnnTitle] = useState('');
   const [annContent, setAnnContent] = useState('');
   const [annType, setAnnType] = useState<'urgent' | 'update' | 'event'>('update');
@@ -98,6 +101,10 @@ export default function AdminView({
   const [newPassword, setNewPassword] = useState('');
   const [newFullName, setNewFullName] = useState('');
   const [newUserRole, setNewUserRole] = useState<'admin' | 'user'>('admin');
+
+  // States for bulk user creation
+  const [bulkUsers, setBulkUsers] = useState<Array<{username: string, password: string, fullName: string, role: 'admin' | 'user'}>>([]);
+  const [isBulkUploading, setIsBulkUploading] = useState(false);
 
   // Synchronize dynamic settings once loaded
   React.useEffect(() => {
@@ -392,19 +399,36 @@ export default function AdminView({
       return;
     }
 
-    const newAnn: Announcement = {
-      id: `ann-${Date.now()}`,
-      title: annTitle.trim(),
-      content: annContent.trim(),
-      type: annType,
-      date: new Date().toISOString().split('T')[0],
-    };
+    if (editingAnnouncement) {
+      const updatedAnn: Announcement = {
+        ...editingAnnouncement,
+        title: annTitle.trim(),
+        content: annContent.trim(),
+        type: annType,
+      };
+      if (onEditAnnouncement) {
+        onEditAnnouncement(updatedAnn);
+      }
+      setIsAnnModalOpen(false);
+      setEditingAnnouncement(null);
+      setAnnTitle('');
+      setAnnContent('');
+      alert('Cập nhật thông báo dòng họ thành công!');
+    } else {
+      const newAnn: Announcement = {
+        id: `ann-${Date.now()}`,
+        title: annTitle.trim(),
+        content: annContent.trim(),
+        type: annType,
+        date: new Date().toISOString().split('T')[0],
+      };
 
-    onAddAnnouncement(newAnn);
-    setIsAnnModalOpen(false);
-    setAnnTitle('');
-    setAnnContent('');
-    alert('Đăng thông báo dòng họ thành công!');
+      onAddAnnouncement(newAnn);
+      setIsAnnModalOpen(false);
+      setAnnTitle('');
+      setAnnContent('');
+      alert('Đăng thông báo dòng họ thành công!');
+    }
   };
 
   const handleSaveBannerSettings = async (e: React.FormEvent) => {
@@ -445,6 +469,119 @@ export default function AdminView({
     } catch (err) {
       alert('Không thể tạo tài khoản lúc này.');
     }
+  };
+
+  // Download account import template (CSV format compatible with Excel)
+  const handleDownloadTemplate = () => {
+    const headers = 'Tên đăng nhập (username),Mật khẩu (password),Tên hiển thị (fullName),Vai trò (admin hoặc user)\n';
+    const sampleData1 = 'nghiemtuan,Matkhau123!,Nghiêm Văn Tuấn,user\n';
+    const sampleData2 = 'nghiemhoa,Matkhau456!,Nghiêm Thị Hoa,admin\n';
+    
+    // Add UTF-8 BOM so Excel opens it with Vietnamese characters correctly
+    const csvContent = '\uFEFF' + headers + sampleData1 + sampleData2;
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'bieu_mau_cap_tai_khoan_dong_loat.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Handle CSV/Excel template parsing for bulk creation
+  const handleBulkUploadChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      if (!text) return;
+
+      const lines = text.split(/\r?\n/);
+      const parsed: Array<{username: string, password: string, fullName: string, role: 'admin' | 'user'}> = [];
+      let errors = [];
+
+      // Skip the header (lines[0])
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue; // Skip empty lines
+
+        const delimiter = line.includes(';') ? ';' : ',';
+        const parts = line.split(delimiter).map(p => p.trim().replace(/^["']|["']$/g, ''));
+
+        if (parts.length < 3) {
+          errors.push(`Dòng ${i + 1}: Thiếu thông tin bắt buộc (Cần: Tên đăng nhập, Mật khẩu, Tên hiển thị)`);
+          continue;
+        }
+
+        const username = parts[0].toLowerCase();
+        const password = parts[1];
+        const fullName = parts[2];
+        let role: 'admin' | 'user' = 'user';
+        if (parts[3] && parts[3].toLowerCase() === 'admin') {
+          role = 'admin';
+        }
+
+        if (!username) {
+          errors.push(`Dòng ${i + 1}: Tên đăng nhập trống.`);
+          continue;
+        }
+        if (!password) {
+          errors.push(`Dòng ${i + 1}: Mật khẩu trống.`);
+          continue;
+        }
+        if (!fullName) {
+          errors.push(`Dòng ${i + 1}: Tên hiển thị trống.`);
+          continue;
+        }
+
+        // Check duplicate within parsed array or existing users
+        if (parsed.some(u => u.username === username) || users.some(u => u.username === username) || username === 'admin') {
+          errors.push(`Dòng ${i + 1}: Tên đăng nhập "${username}" đã tồn tại trên hệ thống hoặc bị trùng lặp.`);
+          continue;
+        }
+
+        parsed.push({ username, password, fullName, role });
+      }
+
+      if (errors.length > 0) {
+        alert("Có một số dòng lỗi phát hiện trong biểu mẫu:\n" + errors.slice(0, 5).join('\n') + (errors.length > 5 ? `\n... và ${errors.length - 5} lỗi khác.` : ''));
+      }
+
+      if (parsed.length > 0) {
+        setBulkUsers(parsed);
+        alert(`Đã đọc thành công ${parsed.length} tài khoản từ biểu mẫu! Vui lòng kiểm tra danh sách xem trước phía dưới và nhấn "Xác nhận cấp đồng loạt" để tạo.`);
+      } else {
+        alert("Không tìm thấy dòng tài khoản hợp lệ nào trong tệp tin để nhập.");
+      }
+    };
+    reader.readAsText(file, 'UTF-8');
+    // Reset file input value
+    e.target.value = '';
+  };
+
+  // Submit parsed users bulk addition
+  const handleBulkSubmitConfirm = async () => {
+    if (bulkUsers.length === 0) return;
+    setIsBulkUploading(true);
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const u of bulkUsers) {
+      try {
+        await onAddUser(u);
+        successCount++;
+      } catch (err) {
+        console.error(`Cấp tài khoản thất bại cho: ${u.username}`, err);
+        failCount++;
+      }
+    }
+
+    setIsBulkUploading(false);
+    alert(`Hoàn thành cấp tài khoản đồng loạt:\n- Thành công: ${successCount} tài khoản\n- Thất bại: ${failCount} tài khoản`);
+    setBulkUsers([]);
   };
 
   return (
@@ -597,7 +734,13 @@ export default function AdminView({
             <div className="flex justify-between items-center bg-[#fdfbf7] p-3 rounded-lg border border-[#f4f0e6]">
               <span className="text-xs text-gray-500 font-semibold">Đăng thông báo giỗ tạ, quyên góp trùng tu nhà họ.</span>
               <button
-                onClick={() => setIsAnnModalOpen(true)}
+                onClick={() => {
+                  setEditingAnnouncement(null);
+                  setAnnTitle('');
+                  setAnnContent('');
+                  setAnnType('update');
+                  setIsAnnModalOpen(true);
+                }}
                 className="px-4 py-2 bg-[#b8956b] text-white text-xs font-bold rounded-lg hover:bg-[#8b7355] transition flex items-center gap-1"
               >
                 <PlusCircle className="w-4 h-4" />
@@ -608,7 +751,7 @@ export default function AdminView({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {announcements.map((ann) => (
                 <div key={ann.id} className="border border-[#eadecb] rounded-xl p-5 bg-white flex justify-between gap-4">
-                  <div className="space-y-2">
+                  <div className="space-y-2 flex-1">
                     <div className="flex items-center gap-2">
                       <span className={`px-2 py-0.5 text-[10px] font-bold rounded ${
                         ann.type === 'urgent' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
@@ -618,19 +761,34 @@ export default function AdminView({
                       <span className="text-xs text-gray-400">{ann.date}</span>
                     </div>
                     <h4 className="font-bold text-sm text-[#6b4724]">{ann.title}</h4>
-                    <p className="text-xs text-gray-500 line-clamp-3">{ann.content}</p>
+                    <p className="text-xs text-gray-500 line-clamp-3 whitespace-pre-line">{ann.content}</p>
                   </div>
-                  <button
-                    onClick={() => {
-                      if (confirm(`Bạn có chắc muốn gỡ bỏ thông báo "${ann.title}"?`)) {
-                        onDeleteAnnouncement(ann.id);
-                      }
-                    }}
-                    className="p-1.5 bg-red-50 text-red-600 rounded border border-red-200 hover:bg-red-100 h-fit self-start transition"
-                    title="Gỡ bỏ"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex flex-col gap-1.5 self-start">
+                    <button
+                      onClick={() => {
+                        setEditingAnnouncement(ann);
+                        setAnnTitle(ann.title);
+                        setAnnContent(ann.content);
+                        setAnnType(ann.type);
+                        setIsAnnModalOpen(true);
+                      }}
+                      className="p-1.5 bg-amber-50 text-amber-700 rounded border border-amber-200 hover:bg-amber-100 transition"
+                      title="Sửa thông báo"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (confirm(`Bạn có chắc muốn gỡ bỏ thông báo "${ann.title}"?`)) {
+                          onDeleteAnnouncement(ann.id);
+                        }
+                      }}
+                      className="p-1.5 bg-red-50 text-red-600 rounded border border-red-200 hover:bg-red-100 transition"
+                      title="Gỡ bỏ"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -791,69 +949,153 @@ export default function AdminView({
         {adminTab === 'users' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 text-xs text-[#4a331a]">
             
-            {/* Create new account form */}
-            <form onSubmit={handleCreateUserSubmit} className="lg:col-span-1 bg-[#fdfbf7] p-5 rounded-xl border border-[#eadecb] space-y-4 h-fit">
-              <h3 className="text-sm font-bold text-[#6b4724] font-serif uppercase tracking-wider flex items-center gap-1.5 border-b border-[#eadecb] pb-2">
-                <Key className="w-4 h-4 text-[#b8956b]" />
-                Cấp Tài Khoản Mới
-              </h3>
+            <div className="lg:col-span-1 space-y-6">
+              {/* Create new account form */}
+              <form onSubmit={handleCreateUserSubmit} className="bg-[#fdfbf7] p-5 rounded-xl border border-[#eadecb] space-y-4">
+                <h3 className="text-sm font-bold text-[#6b4724] font-serif uppercase tracking-wider flex items-center gap-1.5 border-b border-[#eadecb] pb-2">
+                  <Key className="w-4 h-4 text-[#b8956b]" />
+                  Cấp Tài Khoản Mới
+                </h3>
 
-              <div>
-                <label className="block font-bold text-[#6b4724] mb-1">Tên tài khoản đăng nhập (*):</label>
-                <input
-                  type="text"
-                  required
-                  value={newUsername}
-                  onChange={(e) => setNewUsername(e.target.value)}
-                  className="w-full p-2 border border-[#d6b583] rounded bg-white focus:outline-none"
-                  placeholder="Ví dụ: nghiemtuan"
-                />
-              </div>
+                <div>
+                  <label className="block font-bold text-[#6b4724] mb-1">Tên tài khoản đăng nhập (*):</label>
+                  <input
+                    type="text"
+                    required
+                    value={newUsername}
+                    onChange={(e) => setNewUsername(e.target.value)}
+                    className="w-full p-2 border border-[#d6b583] rounded bg-white focus:outline-none"
+                    placeholder="Ví dụ: nghiemtuan"
+                  />
+                </div>
 
-              <div>
-                <label className="block font-bold text-[#6b4724] mb-1">Mật khẩu truy cập (*):</label>
-                <input
-                  type="password"
-                  required
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full p-2 border border-[#d6b583] rounded bg-white focus:outline-none"
-                  placeholder="Nhập mật khẩu an toàn..."
-                />
-              </div>
+                <div>
+                  <label className="block font-bold text-[#6b4724] mb-1">Mật khẩu truy cập (*):</label>
+                  <input
+                    type="password"
+                    required
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full p-2 border border-[#d6b583] rounded bg-white focus:outline-none"
+                    placeholder="Nhập mật khẩu an toàn..."
+                  />
+                </div>
 
-              <div>
-                <label className="block font-bold text-[#6b4724] mb-1">Tên hiển thị đầy đủ (*):</label>
-                <input
-                  type="text"
-                  required
-                  value={newFullName}
-                  onChange={(e) => setNewFullName(e.target.value)}
-                  className="w-full p-2 border border-[#d6b583] rounded bg-white focus:outline-none"
-                  placeholder="Ví dụ: Nghiêm Văn Tuấn"
-                />
-              </div>
+                <div>
+                  <label className="block font-bold text-[#6b4724] mb-1">Tên hiển thị đầy đủ (*):</label>
+                  <input
+                    type="text"
+                    required
+                    value={newFullName}
+                    onChange={(e) => setNewFullName(e.target.value)}
+                    className="w-full p-2 border border-[#d6b583] rounded bg-white focus:outline-none"
+                    placeholder="Ví dụ: Nghiêm Văn Tuấn"
+                  />
+                </div>
 
-              <div>
-                <label className="block font-bold text-[#6b4724] mb-1">Vai trò hệ thống:</label>
-                <select
-                  value={newUserRole}
-                  onChange={(e) => setNewUserRole(e.target.value as 'admin' | 'user')}
-                  className="w-full p-2 border border-[#d6b583] rounded bg-white focus:outline-none"
+                <div>
+                  <label className="block font-bold text-[#6b4724] mb-1">Vai trò hệ thống:</label>
+                  <select
+                    value={newUserRole}
+                    onChange={(e) => setNewUserRole(e.target.value as 'admin' | 'user')}
+                    className="w-full p-2 border border-[#d6b583] rounded bg-white focus:outline-none"
+                  >
+                    <option value="admin">Quản trị viên (Toàn quyền)</option>
+                    <option value="user">Thành viên dòng họ (Chỉ xem và khấn nguyện)</option>
+                  </select>
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-2 bg-[#b8956b] hover:bg-[#8b7355] text-white font-bold rounded transition flex items-center justify-center gap-1.5"
                 >
-                  <option value="admin">Quản trị viên (Toàn quyền)</option>
-                  <option value="user">Thành viên dòng họ (Chỉ xem và khấn nguyện)</option>
-                </select>
-              </div>
+                  <Plus className="w-4 h-4" />
+                  Cấp Tài Khoản
+                </button>
+              </form>
 
-              <button
-                type="submit"
-                className="w-full py-2 bg-[#b8956b] hover:bg-[#8b7355] text-white font-bold rounded transition flex items-center justify-center gap-1.5"
-              >
-                <Plus className="w-4 h-4" />
-                Cấp Tài Khoản
-              </button>
-            </form>
+              {/* Bulk Create accounts */}
+              <div className="bg-[#fdfbf7] p-5 rounded-xl border border-[#eadecb] space-y-4">
+                <h3 className="text-sm font-bold text-[#6b4724] font-serif uppercase tracking-wider flex items-center gap-1.5 border-b border-[#eadecb] pb-2">
+                  <Users className="w-4 h-4 text-[#b8956b]" />
+                  Cấp Tài Khoản Đồng Loạt
+                </h3>
+                <p className="text-gray-500 leading-relaxed text-[11px]">
+                  Tải biểu mẫu nhập liệu dạng .csv (hoàn toàn tương thích tốt với Excel), nhập thông tin danh sách tài khoản cần cấp rồi tải lên hệ thống.
+                </p>
+
+                <div className="flex flex-col gap-2.5">
+                  <button
+                    type="button"
+                    onClick={handleDownloadTemplate}
+                    className="w-full py-2 bg-white hover:bg-gray-50 text-[#b8956b] border border-[#b8956b] font-bold rounded transition flex items-center justify-center gap-1.5"
+                  >
+                    📥 Tải biểu mẫu tài khoản (.csv)
+                  </button>
+
+                  <div className="relative">
+                    <input
+                      type="file"
+                      accept=".csv"
+                      onChange={handleBulkUploadChange}
+                      className="hidden"
+                      id="bulk-user-file-upload"
+                    />
+                    <label
+                      htmlFor="bulk-user-file-upload"
+                      className="w-full py-2 bg-[#6b4724] hover:bg-[#54371b] text-white font-bold rounded transition flex items-center justify-center gap-1.5 cursor-pointer text-center"
+                    >
+                      📤 Tải lên tệp biểu mẫu (.csv)
+                    </label>
+                  </div>
+                </div>
+
+                {bulkUsers.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-[#eadecb] space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-[#6b4724]">Xem trước ({bulkUsers.length}):</span>
+                      <button
+                        type="button"
+                        onClick={() => setBulkUsers([])}
+                        className="text-red-600 hover:underline font-bold font-semibold"
+                      >
+                        Xóa danh sách
+                      </button>
+                    </div>
+
+                    <div className="max-h-48 overflow-y-auto border border-[#eadecb] rounded bg-white divide-y divide-gray-100">
+                      {bulkUsers.map((bu, idx) => (
+                        <div key={idx} className="p-2 flex flex-col gap-0.5 text-[11px]">
+                          <div className="flex justify-between font-semibold text-gray-700">
+                            <span>{bu.username}</span>
+                            <span className="text-[10px] uppercase px-1 bg-gray-100 rounded text-gray-600 font-bold">{bu.role}</span>
+                          </div>
+                          <div className="text-gray-500 flex justify-between">
+                            <span>Họ tên: {bu.fullName}</span>
+                            <span>Mật khẩu: {bu.password}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={isBulkUploading}
+                      onClick={handleBulkSubmitConfirm}
+                      className="w-full py-2.5 bg-[#b8956b] hover:bg-[#8b7355] text-white font-bold rounded transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                    >
+                      {isBulkUploading ? (
+                        <span>Đang xử lý cấp tài khoản...</span>
+                      ) : (
+                        <>
+                          <span>⚡</span> Xác nhận cấp đồng loạt
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
 
             {/* Existing system users table */}
             <div className="lg:col-span-2 space-y-4">
@@ -1787,7 +2029,7 @@ export default function AdminView({
             {/* Header */}
             <div className="p-5 bg-gradient-to-r from-[#6b4724] to-[#8b7355] text-white flex justify-between items-center">
               <h3 className="text-lg font-bold font-serif uppercase tracking-wider">
-                Đăng Thông Báo Dòng Họ Mới
+                {editingAnnouncement ? 'Chỉnh Sửa Thông Báo Dòng Họ' : 'Đăng Thông Báo Dòng Họ Mới'}
               </h3>
               <button
                 onClick={() => setIsAnnModalOpen(false)}
@@ -1853,7 +2095,7 @@ export default function AdminView({
                   className="px-5 py-2 bg-[#b8956b] hover:bg-[#8b7355] text-white font-bold rounded-lg flex items-center gap-1"
                 >
                   <Save className="w-4 h-4" />
-                  Đăng ngay
+                  {editingAnnouncement ? 'Lưu cập nhật' : 'Đăng ngay'}
                 </button>
               </div>
             </form>

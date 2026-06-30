@@ -474,6 +474,22 @@ export default function App() {
     await addLog(`đăng tải thông báo mới: "${ann.title}"`, currentUser?.fullName || 'admin');
   };
 
+  const handleEditAnnouncement = async (ann: Announcement) => {
+    const updated = announcements.map((a) => (a.id === ann.id ? ann : a));
+    saveAnnouncements(updated);
+
+    try {
+      await fetch(`/api/announcements/${ann.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(ann)
+      });
+    } catch (err) {
+      console.error("Failed to edit announcement on server:", err);
+    }
+    await addLog(`sửa đổi thông báo dòng họ: "${ann.title}"`, currentUser?.fullName || 'admin');
+  };
+
   const handleDeleteAnnouncement = async (id: string) => {
     const title = announcements.find((a) => a.id === id)?.title || id;
     const updated = announcements.filter((a) => a.id !== id);
@@ -1279,6 +1295,7 @@ export default function App() {
                 onEditMember={handleEditMember}
                 onDeleteMember={handleDeleteMember}
                 onAddAnnouncement={handleAddAnnouncement}
+                onEditAnnouncement={handleEditAnnouncement}
                 onDeleteAnnouncement={handleDeleteAnnouncement}
                 settings={settings}
                 onSaveSetting={handleSaveSetting}

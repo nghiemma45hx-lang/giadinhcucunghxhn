@@ -1193,6 +1193,20 @@ app.post("/api/announcements", async (req, res) => {
   }
 });
 
+app.put("/api/announcements/:id", async (req, res) => {
+  try {
+    const supabase = getSupabaseClient();
+    const { id } = req.params;
+    const announcement = req.body;
+    const { error } = await supabase.from("announcements").update(announcement).eq("id", id);
+    if (error) throw error;
+    return res.json({ success: true });
+  } catch (error: any) {
+    console.error("PUT /api/announcements error:", error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 app.delete("/api/announcements/:id", async (req, res) => {
   try {
     const supabase = getSupabaseClient();
