@@ -1003,12 +1003,7 @@ export default function App() {
         
         <div className="relative z-10 max-w-7xl w-full mx-auto px-6 md:px-12 flex flex-col md:flex-row items-center justify-between gap-6 md:gap-8">
           {/* Main Title Section */}
-          <div className="text-center md:text-left flex-1">
-            <div className="flex items-center justify-center md:justify-start space-x-4 mb-3">
-              <div className="h-[1.5px] w-12 md:w-20 bg-[#d6b583]"></div>
-              <div className="text-[#d6b583] text-xl md:text-2xl"><TreeDeciduous className="w-6 h-6 inline" /></div>
-              <div className="h-[1.5px] w-12 md:w-20 bg-[#d6b583] md:hidden"></div>
-            </div>
+          <div className="text-center flex-1">
             <h1 className="text-2xl md:text-4xl lg:text-5xl font-extrabold text-[#fdfbf7] uppercase tracking-widest font-serif drop-shadow-md mb-2">
               {settings.heroTitle}
             </h1>
