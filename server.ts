@@ -1512,13 +1512,18 @@ app.post("/api/config/supabase", async (req, res) => {
       finalKey = prevConfig.serviceRoleKey || "";
     }
 
+    let finalAnonKey = anonKey;
+    if (anonKey === "••••••••••••••••••••••••" || !anonKey) {
+      finalAnonKey = prevConfig.anonKey || "";
+    }
+
     const defaultUrl = "https://domczpyfjiqttwdcrdsj.supabase.co";
     const defaultServiceKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRvbWN6cHlmamlxdHR3ZGNyZHNqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjcwMTM5NCwiZXhwIjoyMDk4Mjc3Mzk0fQ.-2ksd7TQPy6hDPwE2S2OWUzWC0ws04FjecgL2lhRWf0";
     const defaultAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRvbWN6cHlmamlxdHR3ZGNyZHNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI3MDEzOTQsImV4cCI6MjA5ODI3NzM5NH0.7VY58jKG2V-uH9cQik9HRN7KuInjSKFiqHspkK910FE";
 
     const savedUrl = url ? url.trim() : defaultUrl;
     let savedServiceKey = finalKey ? finalKey.trim() : "";
-    let savedAnonKey = anonKey ? anonKey.trim() : "";
+    let savedAnonKey = finalAnonKey ? finalAnonKey.trim() : "";
 
     // If using default/fallback project URL, populate with default keys if missing
     if (savedUrl === defaultUrl || savedUrl.includes("domczpyfjiqttwdcrdsj.supabase.co")) {

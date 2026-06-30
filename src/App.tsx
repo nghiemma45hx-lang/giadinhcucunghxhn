@@ -66,6 +66,43 @@ export default function App() {
     }
   };
 
+  const [editRegion, setEditRegion] = useState('sydney');
+  const [editUrl, setEditUrl] = useState('');
+  const [isSavingConfig, setIsSavingConfig] = useState(false);
+
+  useEffect(() => {
+    if (supabaseStatus) {
+      setEditRegion(supabaseStatus.region || 'sydney');
+      setEditUrl(supabaseStatus.url || 'https://domczpyfjiqttwdcrdsj.supabase.co');
+    }
+  }, [supabaseStatus, isDbStatusModalOpen]);
+
+  const handleSaveDbStatusConfig = async () => {
+    setIsSavingConfig(true);
+    try {
+      const res = await fetch(getApiUrl('/api/config/supabase'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: editUrl,
+          region: editRegion,
+          anonKey: "", // preservable
+          serviceRoleKey: "" // preservable
+        })
+      });
+      if (res.ok) {
+        await fetchSupabaseStatus(true);
+        alert('Cập nhật vùng hoạt động và địa chỉ kết nối cơ sở dữ liệu thành công!');
+      } else {
+        alert('Lưu cấu hình thất bại. Vui lòng thử lại.');
+      }
+    } catch (err: any) {
+      alert(`Đã xảy ra lỗi: ${err.message}`);
+    } finally {
+      setIsSavingConfig(false);
+    }
+  };
+
   useEffect(() => {
     fetchSupabaseStatus();
   }, [currentTab]);
@@ -1947,9 +1984,9 @@ CREATE TABLE IF NOT EXISTS system_settings (
               </button>
             </div>
             <div className="p-6 space-y-4 text-xs font-medium">
-              <div className="space-y-2 pb-4 border-b border-gray-100">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-500">Trạng thái kết nối:</span>
+              <div className="space-y-3 pb-4 border-b border-gray-100">
+                <div className="flex justify-between items-center pb-2 border-b border-dashed border-gray-100">
+                  <span className="text-gray-500 font-bold text-[11px]">Trạng thái kết nối:</span>
                   <span className={`font-bold uppercase tracking-wider text-[11px] px-2.5 py-0.5 rounded-full ${
                     tablesNeedInitialization
                       ? 'bg-amber-50 text-amber-700 border border-amber-200'
@@ -1966,28 +2003,42 @@ CREATE TABLE IF NOT EXISTS system_settings (
                       : 'Trực tuyến (Connected)'}
                   </span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-500">Vùng hoạt động hiện tại:</span>
-                  <span className="font-bold text-gray-800">
-                    {supabaseStatus ? getRegionLabel(supabaseStatus.region) : 'Châu Đại Dương (Sydney, Úc)'}
-                  </span>
+
+                <div className="space-y-1">
+                  <label className="block text-gray-500 font-bold text-[11px]">Vùng hoạt động (Chọn vùng Châu Á):</label>
+                  <select
+                    value={editRegion}
+                    onChange={(e) => setEditRegion(e.target.value)}
+                    className="w-full p-2 border border-[#d6b583] rounded bg-white font-medium focus:ring-1 focus:ring-[#b8956b] focus:outline-none text-[11px] text-[#4a331a]"
+                  >
+                    <option value="sydney">Châu Đại Dương (Sydney, Úc - Mặc định)</option>
+                    <option value="singapore">Châu Á (Singapore - Tối ưu nhất)</option>
+                    <option value="tokyo">Châu Á (Tokyo, Nhật Bản)</option>
+                    <option value="custom">Vùng tùy chọn khác</option>
+                  </select>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-500">Độ trễ kết nối (ước tính):</span>
+
+                <div className="space-y-1">
+                  <label className="block text-gray-500 font-bold text-[11px]">Địa chỉ Endpoint (Supabase URL):</label>
+                  <input
+                    type="url"
+                    value={editUrl}
+                    onChange={(e) => setEditUrl(e.target.value)}
+                    className="w-full p-2 border border-[#d6b583] rounded bg-white font-medium focus:ring-1 focus:ring-[#b8956b] focus:outline-none text-[11px] text-[#4a331a] font-mono"
+                    placeholder="Ví dụ: https://xxxxxxxxx.supabase.co"
+                  />
+                </div>
+
+                <div className="flex justify-between items-center bg-[#fdfbf7] p-2.5 rounded-lg border border-[#eadecb]">
+                  <span className="text-gray-500 font-bold text-[11px]">Độ trễ kết nối (ước tính):</span>
                   <span className="font-bold text-[#b8956b]">
                     {!supabaseStatus || !supabaseStatus.success
                       ? '--'
-                      : supabaseStatus.region === 'singapore'
+                      : editRegion === 'singapore'
                       ? '35 ms (Tối ưu)'
-                      : supabaseStatus.region === 'tokyo'
+                      : editRegion === 'tokyo'
                       ? '70 ms (Tốt)'
                       : '220 ms (Bình thường)'}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-500">Địa chỉ Endpoint:</span>
-                  <span className="font-mono text-[10px] text-gray-600 truncate max-w-[200px]" title={supabaseStatus?.url}>
-                    {supabaseStatus?.url || 'https://domczpyfjiqttwdcrdsj.supabase.co'}
                   </span>
                 </div>
               </div>
@@ -2005,15 +2056,15 @@ CREATE TABLE IF NOT EXISTS system_settings (
                   )}
                 </p>
                 <p className="bg-[#fdfbf7] p-3 rounded-lg border border-[#eadecb] text-[11px]">
-                  <strong>Mẹo chuyển vùng Châu Á:</strong> Bạn có thể dễ dàng chuyển đổi máy chủ lưu trữ dữ liệu phả hệ của dòng họ sang <strong>Singapore</strong> hoặc <strong>Nhật Bản</strong> để cải thiện tốc độ truy cập gấp 10 lần bằng cách nhấp vào nút cấu hình bên dưới.
+                  <strong>Mẹo chọn vùng Châu Á:</strong> Bạn có thể dễ dàng chuyển đổi máy chủ lưu trữ dữ liệu phả hệ của dòng họ sang <strong>Singapore</strong> hoặc <strong>Nhật Bản</strong> ở trên để cải thiện tốc độ truy cập gấp 10 lần, sau đó bấm <strong>Lưu & Áp dụng</strong>.
                 </p>
               </div>
 
               <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-gray-100">
                 <button
-                  disabled={isCheckingDb}
+                  disabled={isCheckingDb || isSavingConfig}
                   onClick={() => fetchSupabaseStatus(true)}
-                  className={`bg-emerald-600 text-white hover:bg-emerald-700 px-4 py-2 rounded-lg font-bold transition flex-1 text-center disabled:opacity-50 flex items-center justify-center gap-1.5`}
+                  className={`bg-emerald-600 text-white hover:bg-emerald-700 px-3 py-2 rounded-lg font-bold transition flex-1 text-center disabled:opacity-50 flex items-center justify-center gap-1.5`}
                 >
                   {isCheckingDb ? (
                     <>
@@ -2025,24 +2076,22 @@ CREATE TABLE IF NOT EXISTS system_settings (
                   )}
                 </button>
                 <button
-                  onClick={() => {
-                    setIsDbStatusModalOpen(false);
-                    setCurrentTab('admin');
-                    // wait for render and scroll to db config section
-                    setTimeout(() => {
-                      const el = document.getElementById('supabase-config-section');
-                      if (el) {
-                        el.scrollIntoView({ behavior: 'smooth' });
-                      }
-                    }, 300);
-                  }}
-                  className="bg-amber-600 text-white hover:bg-amber-700 px-4 py-2 rounded-lg font-bold transition flex-1 text-center"
+                  disabled={isCheckingDb || isSavingConfig}
+                  onClick={handleSaveDbStatusConfig}
+                  className="bg-amber-600 text-white hover:bg-amber-700 px-3 py-2 rounded-lg font-bold transition flex-1 text-center disabled:opacity-50 flex items-center justify-center gap-1.5"
                 >
-                  Cấu hình Vùng / Khóa
+                  {isSavingConfig ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                      <span>Đang lưu...</span>
+                    </>
+                  ) : (
+                    'Lưu & Áp dụng'
+                  )}
                 </button>
                 <button
                   onClick={() => setIsDbStatusModalOpen(false)}
-                  className="bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 py-2 rounded-lg font-bold transition flex-1 text-center"
+                  className="bg-gray-100 text-gray-700 hover:bg-gray-200 px-3 py-2 rounded-lg font-bold transition flex-1 text-center"
                 >
                   Đóng
                 </button>
