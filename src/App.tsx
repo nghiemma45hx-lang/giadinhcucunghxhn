@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { TreeDeciduous, LogIn, LogOut, Shield, Heart, Users, BookOpen, BarChart3, HelpCircle, Star } from 'lucide-react';
+import { TreeDeciduous, LogIn, LogOut, Shield, Heart, Users, BookOpen, BarChart3, HelpCircle, Star, Edit, Image } from 'lucide-react';
 import { FamilyMember, Announcement, AltarPrayer, SystemLog, SystemUser } from './types';
 import { initialMembers, initialAnnouncements } from './data/familyData';
 
@@ -12,6 +12,7 @@ import MemberTableView from './components/MemberTableView';
 import MemorialView from './components/MemorialView';
 import StatisticsView from './components/StatisticsView';
 import AdminView from './components/AdminView';
+import { ImageUploader } from './components/ImageUploader';
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState('home');
@@ -29,6 +30,8 @@ export default function App() {
     heroTitle: localStorage.getItem('heroTitle') || "Gia Phả Gia Đình",
     heroSubtitle: localStorage.getItem('heroSubtitle') || "Cụ Nghiêm Cung",
     heroImage: localStorage.getItem('heroImage') || "https://images.unsplash.com/photo-1605369572399-05d8d64a0f6e?q=80&w=2000&auto=format&fit=crop",
+    heroFrameImage: localStorage.getItem('heroFrameImage') || "",
+    heroFrameText: localStorage.getItem('heroFrameText') || "Mộc bản thụ nguyên, thuỷ lưu tuyền bản",
     introText1: localStorage.getItem('introText1') || "Cây có gốc mới nở cành xanh ngọn, nước có nguồn mới bể rộng sông sâu. Người có tổ tông mới sinh con cháu, hiếu nghĩa vẹn tròn mới rạng rỡ tổ tiên.",
     introText2: localStorage.getItem('introText2') || "Gia phả gia đình dòng họ Cụ Nghiêm Cung (kế thừa dòng dõi cụ cố Nghiêm Điều (Chu) tại vùng đất Hòa Xá cổ kính, giàu truyền thống cách mạng) được lập ra nhằm mục đích kính cáo tổ tông, ghi chép tường tận huyết mạch dòng giống, lưu truyền cho con cháu vạn đời sau không bao giờ quên đi nguồn cội thiêng liêng của mình.",
     introText3: localStorage.getItem('introText3') || "Trải qua bao thăng trầm của lịch sử, con cháu họ Nghiêm luôn gìn giữ nếp gia phong nghiêm cẩn, lấy hiếu học làm đầu, lấy đức độ làm trọng, lấy trung thực làm gương và hết lòng đùm bọc, giúp đỡ lẫn nhau vượt qua gian khó, lập thân kiến nghiệp làm rạng danh gia đình."
@@ -40,6 +43,9 @@ export default function App() {
   // Auth States
   const [currentUser, setCurrentUser] = useState<{ username: string; fullName: string; role: string } | null>(null);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isHeroFrameModalOpen, setIsHeroFrameModalOpen] = useState(false);
+  const [tempFrameImage, setTempFrameImage] = useState('');
+  const [tempFrameText, setTempFrameText] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
@@ -988,25 +994,77 @@ export default function App() {
     <div className="min-h-screen flex flex-col text-[#4a331a] bg-[#fdfbf7] font-sans">
       
       {/* 1. HERO BANNER HEADER */}
-      <header className="relative bg-[#3e2a16] h-[220px] md:h-[280px] flex items-center justify-center overflow-hidden">
+      <header className="relative bg-[#3e2a16] min-h-[220px] md:h-[280px] py-6 md:py-0 flex items-center justify-center overflow-hidden">
         <div 
           className="absolute inset-0 opacity-25 bg-center bg-cover" 
           style={{ backgroundImage: `url('${settings.heroImage}')` }}
         ></div>
         <div className="absolute inset-0 bg-gradient-to-t from-[#2a1d0f] to-transparent"></div>
         
-        <div className="relative z-10 text-center px-4">
-          <div className="flex items-center justify-center space-x-4 mb-3">
-            <div className="h-[1.5px] w-12 md:w-20 bg-[#d6b583]"></div>
-            <div className="text-[#d6b583] text-xl md:text-2xl"><TreeDeciduous className="w-6 h-6 inline" /></div>
-            <div className="h-[1.5px] w-12 md:w-20 bg-[#d6b583]"></div>
+        <div className="relative z-10 max-w-7xl w-full mx-auto px-6 md:px-12 flex flex-col md:flex-row items-center justify-between gap-6 md:gap-8">
+          {/* Main Title Section */}
+          <div className="text-center md:text-left flex-1">
+            <div className="flex items-center justify-center md:justify-start space-x-4 mb-3">
+              <div className="h-[1.5px] w-12 md:w-20 bg-[#d6b583]"></div>
+              <div className="text-[#d6b583] text-xl md:text-2xl"><TreeDeciduous className="w-6 h-6 inline" /></div>
+              <div className="h-[1.5px] w-12 md:w-20 bg-[#d6b583] md:hidden"></div>
+            </div>
+            <h1 className="text-2xl md:text-4xl lg:text-5xl font-extrabold text-[#fdfbf7] uppercase tracking-widest font-serif drop-shadow-md mb-2">
+              {settings.heroTitle}
+            </h1>
+            <h2 className="text-xl md:text-2.5xl lg:text-3.5xl font-extrabold text-[#d6b583] uppercase tracking-widest font-serif drop-shadow-sm">
+              {settings.heroSubtitle}
+            </h2>
           </div>
-          <h1 className="text-2xl md:text-5xl font-extrabold text-[#fdfbf7] uppercase tracking-widest font-serif drop-shadow-md mb-2">
-            {settings.heroTitle}
-          </h1>
-          <h2 className="text-xl md:text-3.5xl font-extrabold text-[#d6b583] uppercase tracking-widest font-serif drop-shadow-sm">
-            {settings.heroSubtitle}
-          </h2>
+
+          {/* Elegant Frame (The requested Red Box position on right) */}
+          <div className="relative group p-1.5 border border-[#d6b583]/40 rounded-xl bg-black/20 shrink-0 shadow-lg">
+            {currentUser?.role === 'admin' && (
+              <button
+                onClick={() => {
+                  setTempFrameImage(settings.heroFrameImage || '');
+                  setTempFrameText(settings.heroFrameText || '');
+                  setIsHeroFrameModalOpen(true);
+                }}
+                className="absolute top-3 right-3 bg-black/75 hover:bg-[#b8956b] text-[#fdfbf7] p-1.5 rounded-full border border-[#d6b583]/50 transition duration-200 shadow-md z-30 cursor-pointer"
+                title="Chỉnh sửa nhanh khung hình/chữ"
+              >
+                <Edit className="w-3.5 h-3.5" />
+              </button>
+            )}
+            
+            <div className="w-[200px] h-[200px] md:w-[240px] md:h-[200px] border-2 border-[#d6b583] rounded-lg bg-[#2a1d0f]/80 backdrop-blur-xs flex flex-col items-center justify-center p-3 text-center overflow-hidden relative shadow-inner">
+              {settings.heroFrameImage ? (
+                <>
+                  <img 
+                    src={settings.heroFrameImage} 
+                    alt="Khung hình lưu niệm" 
+                    referrerPolicy="no-referrer"
+                    className="absolute inset-0 w-full h-full object-cover rounded-sm opacity-90 transition duration-300 group-hover:scale-105"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                  {settings.heroFrameText && (
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent p-3 pt-8 flex items-end justify-center">
+                      <p className="font-serif font-bold text-xs text-[#fdfbf7] tracking-wider drop-shadow-md text-center max-w-[95%]">
+                        {settings.heroFrameText}
+                      </p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full w-full py-2">
+                  <div className="text-[#d6b583]/30 mb-2"><TreeDeciduous className="w-8 h-8" /></div>
+                  <div className="w-12 h-[1px] bg-[#d6b583]/40 mb-3"></div>
+                  <p className="font-serif font-bold text-xs md:text-sm text-[#d6b583] tracking-widest leading-relaxed italic uppercase max-w-[90%]">
+                    {settings.heroFrameText || "Uống nước nhớ nguồn"}
+                  </p>
+                  <div className="w-12 h-[1px] bg-[#d6b583]/40 mt-3"></div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </header>
 
@@ -1314,6 +1372,68 @@ export default function App() {
                 Tài khoản dùng thử quy định: <strong>admin / admin</strong>
               </p>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 6.5 HERO FRAME EDIT MODAL */}
+      {isHeroFrameModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full overflow-hidden border border-[#b8956b] shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="p-5 bg-[#3e2a16] text-center text-white relative">
+              <button
+                onClick={() => setIsHeroFrameModalOpen(false)}
+                className="absolute top-4 right-4 text-gray-400 hover:text-white text-xl font-bold leading-none"
+              >
+                &times;
+              </button>
+              <Image className="w-10 h-10 text-[#d6b583] mx-auto mb-2" />
+              <h3 className="text-xl font-bold font-serif uppercase tracking-widest text-[#fdfbf7]">Cấu Hình Khung Banner</h3>
+              <p className="text-[10px] text-gray-400 mt-1">Chỉnh sửa nhanh hình ảnh và chữ hiển thị ở góc phải Hero banner</p>
+            </div>
+
+            <div className="p-6 space-y-4 text-xs text-[#4a331a]">
+              <div>
+                <label className="block font-bold text-[#6b4724] mb-1">Chữ hiển thị trong Khung:</label>
+                <input
+                  type="text"
+                  placeholder="Nhập câu đối, phương ngôn hoặc lời tựa của gia tộc..."
+                  value={tempFrameText}
+                  onChange={(e) => setTempFrameText(e.target.value)}
+                  className="w-full p-2.5 border border-[#d6b583] rounded bg-[#fdfbf7] text-sm focus:outline-none focus:ring-2 focus:ring-[#b8956b]"
+                />
+              </div>
+
+              <div>
+                <ImageUploader
+                  value={tempFrameImage}
+                  onChange={setTempFrameImage}
+                  label="Tải ảnh lên hoặc dán liên kết hình ảnh:"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsHeroFrameModalOpen(false)}
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs py-3 rounded-lg transition uppercase tracking-wider"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await handleSaveSetting('heroFrameImage', tempFrameImage);
+                    await handleSaveSetting('heroFrameText', tempFrameText);
+                    setIsHeroFrameModalOpen(false);
+                    alert('Đã cập nhật khung hình Hero banner thành công!');
+                  }}
+                  className="flex-1 bg-[#b8956b] hover:bg-[#8b7355] text-white font-extrabold text-xs py-3 rounded-lg shadow-md transition uppercase tracking-wider"
+                >
+                  Lưu thay đổi
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

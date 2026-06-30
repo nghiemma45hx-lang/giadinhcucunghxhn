@@ -87,6 +87,8 @@ export default function AdminView({
   const [settingsHeroTitle, setSettingsHeroTitle] = useState(settings.heroTitle || 'Gia Phả Gia Đình');
   const [settingsHeroSubtitle, setSettingsHeroSubtitle] = useState(settings.heroSubtitle || 'Cụ Nghiêm Cung');
   const [settingsHeroImage, setSettingsHeroImage] = useState(settings.heroImage || 'https://images.unsplash.com/photo-1605369572399-05d8d64a0f6e?q=80&w=2000&auto=format&fit=crop');
+  const [settingsHeroFrameImage, setSettingsHeroFrameImage] = useState(settings.heroFrameImage || '');
+  const [settingsHeroFrameText, setSettingsHeroFrameText] = useState(settings.heroFrameText || 'Mộc bản thụ nguyên, thuỷ lưu tuyền bản');
   const [settingsIntroText1, setSettingsIntroText1] = useState(settings.introText1 || 'Cây có gốc mới nở cành xanh ngọn, nước có nguồn mới bể rộng sông sâu. Người có tổ tông mới sinh con cháu, hiếu nghĩa vẹn tròn mới rạng rỡ tổ tiên.');
   const [settingsIntroText2, setSettingsIntroText2] = useState(settings.introText2 || 'Gia phả gia đình dòng họ Cụ Nghiêm Cung (kế thừa dòng dõi cụ cố Nghiêm Điều (Chu) tại vùng đất Hòa Xá cổ kính, giàu truyền thống cách mạng) được lập ra nhằm mục đích kính cáo tổ tông, ghi chép tường tận huyết mạch dòng giống, lưu truyền cho con cháu vạn đời sau không bao giờ quên đi nguồn cội thiêng liêng của mình.');
   const [settingsIntroText3, setSettingsIntroText3] = useState(settings.introText3 || 'Trải qua bao thăng trầm của lịch sử, con cháu họ Nghiêm luôn gìn giữ nếp gia phong nghiêm cẩn, lấy hiếu học làm đầu, lấy đức độ làm trọng, lấy trung thực làm gương và hết lòng đùm bọc, giúp đỡ lẫn nhau vượt qua gian khó, lập thân kiến nghiệp làm rạng danh gia đình.');
@@ -102,6 +104,8 @@ export default function AdminView({
     if (settings.heroTitle) setSettingsHeroTitle(settings.heroTitle);
     if (settings.heroSubtitle) setSettingsHeroSubtitle(settings.heroSubtitle);
     if (settings.heroImage) setSettingsHeroImage(settings.heroImage);
+    if (settings.heroFrameImage !== undefined) setSettingsHeroFrameImage(settings.heroFrameImage);
+    if (settings.heroFrameText !== undefined) setSettingsHeroFrameText(settings.heroFrameText);
     if (settings.introText1) setSettingsIntroText1(settings.introText1);
     if (settings.introText2) setSettingsIntroText2(settings.introText2);
     if (settings.introText3) setSettingsIntroText3(settings.introText3);
@@ -409,10 +413,12 @@ export default function AdminView({
       await onSaveSetting('heroTitle', settingsHeroTitle);
       await onSaveSetting('heroSubtitle', settingsHeroSubtitle);
       await onSaveSetting('heroImage', settingsHeroImage);
+      await onSaveSetting('heroFrameImage', settingsHeroFrameImage);
+      await onSaveSetting('heroFrameText', settingsHeroFrameText);
       await onSaveSetting('introText1', settingsIntroText1);
       await onSaveSetting('introText2', settingsIntroText2);
       await onSaveSetting('introText3', settingsIntroText3);
-      alert('Đã cập nhật cấu hình Banner và thông tin giới thiệu Gia tộc thành công!');
+      alert('Đã cập nhật cấu hình Banner, Khung hình và thông tin giới thiệu Gia tộc thành công!');
     } catch (err) {
       alert('Đã xảy ra lỗi khi lưu cấu hình.');
     }
@@ -697,6 +703,34 @@ export default function AdminView({
                   />
                   <div className="mt-2 text-[10px] text-gray-400">
                     Mẹo: Bạn có thể tải ảnh trực tiếp từ máy tính, dán liên kết Google Drive (hệ thống tự chuyển đổi) hoặc CDN bất kỳ.
+                  </div>
+                </div>
+
+                <div className="md:col-span-2 border-t border-dashed border-[#eadecb] pt-4 mt-2 space-y-4">
+                  <h4 className="font-bold text-xs text-[#b8956b] font-serif uppercase tracking-widest">
+                    Cấu hình Khung hình / Chữ góc phải Hero Banner
+                  </h4>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block font-bold text-[#6b4724] mb-1">Chữ hiển thị trong Khung:</label>
+                      <input
+                        type="text"
+                        value={settingsHeroFrameText}
+                        onChange={(e) => setSettingsHeroFrameText(e.target.value)}
+                        className="w-full p-2.5 border border-[#d6b583] rounded bg-white font-medium focus:ring-1 focus:ring-[#b8956b] focus:outline-none"
+                        placeholder="Ví dụ: Mộc bản thụ nguyên, thuỷ lưu tuyền bản..."
+                      />
+                    </div>
+
+                    <div>
+                      <ImageUploader
+                        value={settingsHeroFrameImage}
+                        onChange={setSettingsHeroFrameImage}
+                        label="Hình ảnh hiển thị trong Khung:"
+                        placeholder="Tải ảnh lên hoặc dán URL ảnh muốn lồng vào khung..."
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
