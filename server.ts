@@ -55,7 +55,7 @@ const getSupabaseClient = () => {
   const anon = cleanEnvVar(process.env.SUPABASE_ANON_KEY);
 
   const fallbackUrl = "https://domczpyfjiqttwdcrdsj.supabase.co";
-  const fallbackKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRvbWN6cHlmamlxdHR3ZGNyZHNqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjcwMTM5NCwiZXhwIjoyMDk4Mjc3Mzk0fQ.-2ksd7TQPy6hDPwE2S2OWUzWC0ws04FjecgL2lhRWf0";
+  const fallbackKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRvbWN6cHlmamlxdHR3ZGNyZHNqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjcwMTM5NCwiZXhwIjoyMDk4Mjc3Mzk0fQ.-2ksd7TQPy6hDPwE2S2OWUzWC0ws04FjecgL2lhRWf";
 
   const isCustomProject = url && url !== "MY_SUPABASE_URL" && url.startsWith("http") && !url.includes("domczpyfjiqttwdcrdsj.supabase.co");
 
@@ -82,6 +82,75 @@ const getSupabaseClient = () => {
     }
   });
 };
+
+// Run a startup check on Supabase connection to diagnose and record issues
+(async () => {
+  try {
+    const rawKey = cleanEnvVar(process.env.SUPABASE_SERVICE_ROLE_KEY) || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRvbWN6cHlmamlxdHR3ZGNyZHNqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjcwMTM5NCwiZXhwIjoyMDk4Mjc3Mzk0fQ.-2ksd7TQPy6hDPwE2S2OWUzWC0ws04FjecgL2lhRWf";
+    const url = cleanEnvVar(process.env.SUPABASE_URL) || "https://domczpyfjiqttwdcrdsj.supabase.co";
+    
+    let workingKey = "";
+    let lastError: any = null;
+
+    // First try the raw key as is
+    try {
+      const client = createClient(url, rawKey, { auth: { persistSession: false } });
+      const { data, error } = await client.from("family_members").select("id").limit(1);
+      if (!error) {
+        workingKey = rawKey;
+        console.log("Supabase connection successful with raw key.");
+      } else {
+        lastError = error;
+      }
+    } catch (e) {
+      lastError = e;
+    }
+
+    // If it failed and looks like a truncated JWT signature, brute force the 43rd signature character
+    if (!workingKey && rawKey.startsWith("eyJ") && rawKey.includes(".")) {
+      const parts = rawKey.split(".");
+      if (parts.length === 3 && parts[2].length === 42) {
+        console.log("Detected truncated signature (42 chars instead of 43). Testing 64 possible base64url endings...");
+        const b64Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+        for (let i = 0; i < b64Chars.length; i++) {
+          const candidateKey = rawKey + b64Chars[i];
+          try {
+            const client = createClient(url, candidateKey, { auth: { persistSession: false } });
+            const { error } = await client.from("family_members").select("id").limit(1);
+            if (!error) {
+              console.log(`Success! Automatically restored truncated key signature with character: '${b64Chars[i]}'`);
+              workingKey = candidateKey;
+              break;
+            }
+          } catch (e) {
+            // ignore
+          }
+        }
+      }
+    }
+
+    const status = {
+      timestamp: new Date().toISOString(),
+      success: workingKey !== "",
+      workingKeyTruncated: workingKey ? workingKey.slice(0, 15) + "..." + workingKey.slice(-5) : null,
+      error: workingKey === "" ? {
+        message: lastError?.message || "All signature candidates failed",
+        details: lastError?.details,
+        hint: lastError?.hint,
+        code: lastError?.code
+      } : null
+    };
+    fs.writeFileSync(path.join(process.cwd(), "db_status.json"), JSON.stringify(status, null, 2));
+    console.log("=== SUPABASE STARTUP CONNECTION STATUS ===", status);
+
+    // If we found a working key, update the process environment so getSupabaseClient() uses it!
+    if (workingKey) {
+      process.env.SUPABASE_SERVICE_ROLE_KEY = workingKey;
+    }
+  } catch (e: any) {
+    fs.writeFileSync(path.join(process.cwd(), "db_status.json"), JSON.stringify({ error: e.message || e }, null, 2));
+  }
+})();
 
 // Local JSON Fallback Storage Helpers for system_users and system_settings
 const USERS_FILE = path.join(process.cwd(), "local_users.json");
