@@ -3,55 +3,73 @@ import { Users, Eye, HelpCircle, User, Award, ArrowRight, Heart, RefreshCw, Down
 import { FamilyMember } from '../types';
 import html2canvas from 'html2canvas';
 
-// Helper to run html2canvas safely by temporarily replacing unsupported oklch/oklab colors
+// Helper to run html2canvas safely by cloning the element, converting computed styles to inline,
+// and temporarily disabling external stylesheets to prevent oklch parser crashes.
 const runHtml2CanvasSafely = async (element: HTMLElement, options: any) => {
-  const stylesToRestore: { element: HTMLStyleElement; originalHTML: string }[] = [];
-  const inlineStylesToRestore: { element: HTMLElement; originalStyle: string }[] = [];
+  // 1. Clone element with computed styles inlined
+  const clone = element.cloneNode(true) as HTMLElement;
+  const sourceElements = [element, ...Array.from(element.querySelectorAll('*'))] as HTMLElement[];
+  const cloneElements = [clone, ...Array.from(clone.querySelectorAll('*'))] as HTMLElement[];
   
-  try {
-    // 1. Temporarily patch all <style> elements on the main document
-    const styleElements = document.getElementsByTagName('style');
-    for (let i = 0; i < styleElements.length; i++) {
-      const style = styleElements[i];
-      if (style.innerHTML && (style.innerHTML.includes('oklch') || style.innerHTML.includes('oklab'))) {
-        stylesToRestore.push({ element: style, originalHTML: style.innerHTML });
-        style.innerHTML = style.innerHTML
-          .replace(/oklch\([^)]+\)/g, 'rgb(184, 149, 107)')
-          .replace(/oklab\([^)]+\)/g, 'rgb(184, 149, 107)');
-      }
-    }
-
-    // 2. Temporarily patch all inline styles on elements that have oklch/oklab
-    const allElements = document.getElementsByTagName('*');
-    for (let i = 0; i < allElements.length; i++) {
-      const el = allElements[i] as HTMLElement;
-      if (el.style && el.style.cssText) {
-        if (el.style.cssText.includes('oklch') || el.style.cssText.includes('oklab')) {
-          inlineStylesToRestore.push({ element: el, originalStyle: el.style.cssText });
-          el.style.cssText = el.style.cssText
-            .replace(/oklch\([^)]+\)/g, 'rgb(184, 149, 107)')
-            .replace(/oklab\([^)]+\)/g, 'rgb(184, 149, 107)');
+  for (let i = 0; i < sourceElements.length; i++) {
+    const srcEl = sourceElements[i];
+    const destEl = cloneElements[i];
+    if (srcEl && destEl) {
+      try {
+        const computed = window.getComputedStyle(srcEl);
+        for (let j = 0; j < computed.length; j++) {
+          const propName = computed[j];
+          const propValue = computed.getPropertyValue(propName);
+          destEl.style.setProperty(propName, propValue, computed.getPropertyPriority(propName));
         }
+      } catch (err) {
+        console.warn('Failed to inline computed styles for element', srcEl, err);
       }
     }
+  }
 
-    // 3. Call html2canvas
-    return await html2canvas(element, options);
-  } finally {
-    // 4. Restore everything!
-    for (const item of stylesToRestore) {
-      try {
-        item.element.innerHTML = item.originalHTML;
-      } catch (e) {
-        console.error('Failed to restore style', e);
-      }
+  // Position the clone absolutely offscreen so it's rendering but doesn't disturb layout
+  clone.style.position = 'fixed';
+  clone.style.top = '0';
+  clone.style.left = '0';
+  clone.style.zIndex = '-9999';
+  clone.style.width = element.offsetWidth + 'px';
+  clone.style.height = element.offsetHeight + 'px';
+  clone.style.boxSizing = 'border-box';
+  clone.style.visibility = 'visible';
+  clone.style.opacity = '1';
+  clone.style.pointerEvents = 'none';
+  
+  document.body.appendChild(clone);
+
+  // 2. Temporarily disable all document style sheets to prevent html2canvas's internal CSS parser from crashing on oklch()
+  const stylesheets = Array.from(document.styleSheets);
+  const disabledStates = stylesheets.map(sheet => {
+    try {
+      const wasDisabled = sheet.disabled;
+      sheet.disabled = true;
+      return { sheet, wasDisabled };
+    } catch (e) {
+      return null;
     }
-    for (const item of inlineStylesToRestore) {
-      try {
-        item.element.style.cssText = item.originalStyle;
-      } catch (e) {
-        console.error('Failed to restore inline style', e);
+  }).filter(Boolean);
+
+  try {
+    // 3. Render the clone
+    return await html2canvas(clone, options);
+  } finally {
+    // 4. Restore stylesheets
+    disabledStates.forEach(item => {
+      if (item) {
+        try {
+          item.sheet.disabled = item.wasDisabled;
+        } catch (e) {}
       }
+    });
+
+    // 5. Remove clone
+    if (clone.parentNode) {
+      clone.parentNode.removeChild(clone);
     }
   }
 };
@@ -81,32 +99,7 @@ export default function TreeView({ members, onSyncAll, currentUser, onOpenLogin 
         useCORS: true,
         scale: 2, // High resolution
         backgroundColor: '#ffffff',
-        logging: false,
-        onclone: (clonedDoc) => {
-          // Fix oklch and oklab colors in style tags to prevent html2canvas from crashing
-          const styleElements = clonedDoc.getElementsByTagName('style');
-          for (let i = 0; i < styleElements.length; i++) {
-            const style = styleElements[i];
-            if (style.innerHTML) {
-              style.innerHTML = style.innerHTML
-                .replace(/oklch\([^)]+\)/g, 'rgb(184, 149, 107)')
-                .replace(/oklab\([^)]+\)/g, 'rgb(184, 149, 107)');
-            }
-          }
-
-          // Fix oklch and oklab in inline styles
-          const allElements = clonedDoc.getElementsByTagName('*');
-          for (let i = 0; i < allElements.length; i++) {
-            const el = allElements[i] as HTMLElement;
-            if (el.style && el.style.cssText) {
-              if (el.style.cssText.includes('oklch') || el.style.cssText.includes('oklab')) {
-                el.style.cssText = el.style.cssText
-                  .replace(/oklch\([^)]+\)/g, 'rgb(184, 149, 107)')
-                  .replace(/oklab\([^)]+\)/g, 'rgb(184, 149, 107)');
-              }
-            }
-          }
-        }
+        logging: false
       });
       
       const imgData = canvas.toDataURL('image/png');
@@ -132,32 +125,7 @@ export default function TreeView({ members, onSyncAll, currentUser, onOpenLogin 
         useCORS: true,
         scale: 2, // High resolution
         backgroundColor: '#ffffff',
-        logging: false,
-        onclone: (clonedDoc) => {
-          // Fix oklch and oklab colors in style tags to prevent html2canvas from crashing
-          const styleElements = clonedDoc.getElementsByTagName('style');
-          for (let i = 0; i < styleElements.length; i++) {
-            const style = styleElements[i];
-            if (style.innerHTML) {
-              style.innerHTML = style.innerHTML
-                .replace(/oklch\([^)]+\)/g, 'rgb(184, 149, 107)')
-                .replace(/oklab\([^)]+\)/g, 'rgb(184, 149, 107)');
-            }
-          }
-
-          // Fix oklch and oklab in inline styles
-          const allElements = clonedDoc.getElementsByTagName('*');
-          for (let i = 0; i < allElements.length; i++) {
-            const el = allElements[i] as HTMLElement;
-            if (el.style && el.style.cssText) {
-              if (el.style.cssText.includes('oklch') || el.style.cssText.includes('oklab')) {
-                el.style.cssText = el.style.cssText
-                  .replace(/oklch\([^)]+\)/g, 'rgb(184, 149, 107)')
-                  .replace(/oklab\([^)]+\)/g, 'rgb(184, 149, 107)');
-              }
-            }
-          }
-        }
+        logging: false
       });
       
       const imgData = canvas.toDataURL('image/png');
